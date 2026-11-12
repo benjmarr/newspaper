@@ -223,3 +223,24 @@ def test_process_image_rejects_junk():
     assert articles.process_image(photo(100, 100)) is None
     out = articles.process_image(photo(3000, 2000, fmt="PNG"))
     assert Image.open(io.BytesIO(out)).size == (1600, 1067)
+
+
+def test_page_furniture_removed():
+    body = ("<ul><li>Published</li><li>Published12 hours ago</li><li>Updated 3 May 2026</li></ul>"
+            "<p>Share</p><p>Image source, Getty Images</p><figcaption>Image caption, Crews at work</figcaption>"
+            "<p>Sign up for our Morning Mail newsletter</p><p>The real story starts here.</p>"
+            "<ul><li>Published by the council, the plan was adopted.</li></ul>")
+    out = articles.clean_body(body)
+    assert out == ("<figcaption>Crews at work</figcaption><p>The real story starts here.</p>"
+                   "<ul><li>Published by the council, the plan was adopted.</li></ul>")
+    assert articles.clean_body(out) == out  # running twice changes nothing
+
+
+def test_old_saved_articles_cleaned_when_shown(app, web, logged_in):
+    setup_pages(web)
+    build(app)
+    s = sid(app, "breakwater")
+    with app.state.db.conn() as c:
+        c.execute("UPDATE articles SET body = '<ul><li>Published 1 day ago</li></ul>' || body WHERE story_id = ?", (s,))
+    page = logged_in.get(f"/read/{s}").text
+    assert "Published 1 day ago" not in page and "Work starts in March." in page

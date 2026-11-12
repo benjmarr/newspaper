@@ -699,3 +699,31 @@ def test_external_cards_mark_read_on_tap(app, web, logged_in):
     html = logged_in.get("/").text
     # No saved articles in this test, so every card opens the website and carries the tap-to-mark hook.
     assert html.count("data-mark-read") == html.count('class="card-link"') > 0
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("Get our breaking news email, free app or daily news podcast Police found the boy.", "Police found the boy."),
+    ("Get our daily political email, free app or daily news podcast Rates rose.", "Rates rose."),
+    ("Sign up for the US Breaking News email Some Democrats said no.", "Some Democrats said no."),
+    ("Follow our Australia news live blog for latest updates The RBA held rates.", "The RBA held rates."),
+    ("The council met. Sign up to our Morning Mail newsletter. Rates rose.", "The council met. Rates rose."),
+    ("Residents can sign up to the council's emergency email alerts.", "Residents can sign up to the council's emergency email alerts."),
+    ("Voters should get our message clearly.", "Voters should get our message clearly."),
+    ("A teenager was found near Walhalla Get our breaking news email, free app or daily news podcast William, 17, "
+     "is recovering.", "A teenager was found near Walhalla. William, 17, is recovering."),
+    ("Locals asked: Sign up for what? The email never came.", "Locals asked: Sign up for what? The email never came."),
+])
+def test_promotions_removed_from_summaries(raw, expected):
+    assert text.summarise(raw) == expected
+
+
+def test_promotions_cleaned_on_existing_stories(app, web, logged_in):
+    web.feeds = {"https://local.test/rss": rss("L", [
+        {"title": "Warrnambool flood warning issued", "link": "https://local.test/flood",
+         "summary": "placeholder"}])}
+    build(app)
+    with app.state.db.conn() as c:  # simulate a summary saved before the filter existed
+        c.execute("UPDATE stories SET summary = 'Get our breaking news email, free app or daily news podcast "
+                  "Residents near the Hopkins River should prepare.'")
+    html = logged_in.get("/").text
+    assert "Residents near the Hopkins River" in html and "free app" not in html

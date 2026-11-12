@@ -23,6 +23,7 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
+from . import text
 from .db import Database, iso, utcnow
 from .feeds import USER_AGENT
 
@@ -186,6 +187,26 @@ def sanitise(fragment: str, base_url: str, title: str = "") -> tuple[str, list[s
     return s.result(), s.images
 
 
+# Page furniture that sometimes survives extraction (e.g. the BBC's "Published 12 hours ago").
+JUNK_BLOCK = re.compile(
+    r"<(li|p|h4)>\s*(?:Published|Updated|Last updated)(?:\s*(?:on\s+)?[\w ,:]{0,30}?(?:ago|20\d\d))?\s*</\1>"
+    r"|<(li|p)>\s*(?:Share|Save|Share this|Share this article|Advertisement|Skip advertisement|Image source,[^<]{0,80}"
+    r"|Getty Images|Watch|Listen|Read more|Related topics?|More on this story)\s*</\2>", re.I)
+
+
+def clean_body(body: str) -> str:
+    """Remove left-over page furniture and promotions. Safe to run more than once."""
+    body = JUNK_BLOCK.sub("", body)
+    body = re.sub(r"<(p|li)>([^<]*)</\1>",
+                  lambda m: f"<{m.group(1)}>{text.remove_promos(m.group(2))}</{m.group(1)}>"
+                  if text.PROMO.search(m.group(2)) else m.group(0), body)
+    body = re.sub(r"(<(?:figcaption|p)>)\s*Image caption,\s*", r"\1", body)
+    for _ in range(2):
+        body = re.sub(r"<(p|li|h2|h3|h4|blockquote|figcaption|strong|em)>\s*</\1>", "", body)
+        body = re.sub(r"<(ul|ol)>\s*</\1>", "", body)
+    return body.strip()
+
+
 def word_count(body: str) -> int:
     return len(re.sub(r"<[^>]+>", " ", body).split())
 
@@ -330,6 +351,7 @@ async def fetch_article(client: httpx.AsyncClient, story: dict[str, Any], image_
 
     body = re.sub(r'<img data-i="(\d+)" alt="([^"]*)">', swap, ex.body)
     body = re.sub(r"<figure>\s*(<figcaption>.*?</figcaption>)?\s*</figure>", "", body, flags=re.S)
+    body = clean_body(body)
     return ArticleResult(sid, True, body=body, byline=ex.byline, lead_image=lead,
                          images=[n for n in names if n], words=ex.words)
 

@@ -62,7 +62,30 @@ def strip_html(value: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Newsletter and app promotions that some publishers (notably the Guardian) put in feed summaries.
+PROMO = re.compile(
+    r"\s*\b(?:Get our [\w’'\- ,]{0,60}?email,? (?:our )?free app,? (?:or|and) (?:our )?daily news podcast"
+    r"|Sign up (?:for|to) [^.?!]{0,80}?\b(?:newsletter|email|emails)\b(?: here)?"
+    r"|Follow (?:our|the) [^.?!]{0,60}?\blive(?: blog)? for (?:the )?latest (?:updates|news)"
+    r"|(?:Download|Get) the (?:free )?Guardian app\b)\s*[.:–—-]?\s*")
+
+
+def remove_promos(text: str) -> str:
+    """Strip publisher promotions. The phrases are matched case-sensitively, as publishers write them,
+    so an ordinary sentence like "residents can sign up to email alerts" is left alone."""
+    def repl(m: re.Match) -> str:
+        before = text[:m.start()].rstrip()
+        after = text[m.end():]
+        if not before or not after.strip():
+            return " "
+        # "…Gippsland region Get our … podcast William was found" -> "…Gippsland region. William was found"
+        end = before.rstrip("”\"’'")  # look past a closing quote: ‘…tumour’ still needs a full stop
+        return " " if end and end[-1] in ".!?…:;" else ". "
+    return re.sub(r"\s{2,}", " ", PROMO.sub(repl, text or "")).strip()
+
+
 def summarise(text: str, limit: int = 260) -> str:
+    text = remove_promos(text)
     text = re.sub(r"\s*(The post .* appeared first on .*|Continue reading\.*|Read more\.*|\[…\]|\[\.\.\.\])\s*$",
                   "", text, flags=re.I).strip()
     if len(text) <= limit:

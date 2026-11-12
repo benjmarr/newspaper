@@ -220,6 +220,7 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                               f"LEFT JOIN feeds f ON f.id = s.feed_id WHERE s.id IN ({marks})", tuple(also_ids)):
                 also_rows[r["id"]] = dict(r)
         for it in items:
+            it["summary"] = text.remove_promos(it.get("summary") or "")
             it["label"] = effective_label(it)
             it["label_corrected"] = it.get("label_override") in text.LABELS
             it["also_list"] = [also_rows[s] for s in json.loads(it["also"]) if s in also_rows]
@@ -347,6 +348,9 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         if row is None:
             raise HTTPException(404, "That story isn't stored any more.")
         it = dict(row)
+        it["summary"] = text.remove_promos(it.get("summary") or "")
+        if it.get("body"):
+            it["body"] = articles.clean_body(it["body"])
         it["label"] = effective_label(it)
         it["label_corrected"] = it.get("label_override") in text.LABELS
         placed = db.query_one(
