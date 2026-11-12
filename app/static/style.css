@@ -119,6 +119,14 @@ code { font-size: 0.9em; }
 .card { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px 10px; margin: 0 0 16px; display: block; }
 .card .headline { font-size: 1.2rem; margin: 6px 0 6px; font-weight: 700; }
 .card .headline a { text-decoration: none; }
+/* The whole card is the link: the headline's link stretches over it. Other controls sit above it. */
+.card { position: relative; }
+.card-link::after { content: ""; position: absolute; inset: 0; border-radius: 8px; z-index: 0; }
+.card-link:focus-visible { outline: none; }
+.card-link:focus-visible::after { outline: 3px solid var(--accent); outline-offset: 2px; }
+.card:has(.card-link):active { background: var(--pressed); }
+.also a, .actions, .hidden-note { position: relative; z-index: 1; }
+.external { color: var(--muted); font-size: 13px; }
 .card-lead .headline { font-size: clamp(1.5rem, 3vw, 2.1rem); }
 .card-sublead .headline { font-size: 1.35rem; }
 .summary { margin: 0 0 8px; }
@@ -131,7 +139,7 @@ code { font-size: 0.9em; }
 .label-opinion { color: var(--opinion); }
 .label-wild { color: var(--accent); }
 .also { font-size: 0.9rem; color: var(--muted); margin: 0 0 8px; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin-top: -4px; }
 .actions form { margin: 0; }
 .hidden-note { display: none; }
 .card.is-hidden { padding: 8px 12px; }
@@ -260,4 +268,3 @@ label { font-family: var(--sans); font-size: 15px; }
 .reader-summary { font-size: 1.15rem; }
 .reader-note { border-top: 1px solid var(--rule); padding-top: 8px; }
 .reader-foot { max-width: 760px; margin: 16px auto; }
-.btn-read.btn-primary { color: var(--paper); }

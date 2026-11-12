@@ -108,9 +108,9 @@ def test_cards_link_to_reader_or_source(app, web, logged_in):
     ok = sid(app, "breakwater")
     paywalled = sid(app, "Apple announces")
     ok_card = re.search(rf'id="story-{ok}".*?</article>', html, re.S).group(0)
-    assert f'href="/read/{ok}"' in ok_card and "Read at source" not in ok_card
+    assert f'href="/read/{ok}"' in ok_card and "opens website" not in ok_card
     bad_card = re.search(rf'id="story-{paywalled}".*?</article>', html, re.S).group(0)
-    assert "/read/" not in bad_card and "Read at source ↗" in bad_card
+    assert "/read/" not in bad_card and "opens website ↗" in bad_card and "https://tech.test/apple" in bad_card
 
 
 def test_failed_article_fallback_and_retry(app, web, logged_in):

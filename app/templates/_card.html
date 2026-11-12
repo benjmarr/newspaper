@@ -1,12 +1,5 @@
-{% macro story_actions(it, back, show_read) -%}
+{% macro story_actions(it, back) -%}
 <div class="actions">
-  {% if show_read %}
-    {% if it.article_status == 'ok' %}
-  <a class="btn btn-read btn-primary" href="/read/{{ it.story_id }}">Read</a>
-    {% else %}
-  <a class="btn btn-read" href="{{ it.url }}" target="_blank" rel="noopener noreferrer">Read at source ↗</a>
-    {% endif %}
-  {% endif %}
   <details class="more">
     <summary class="btn-quiet" aria-label="More options for this story" title="More options">⋯</summary>
     <div class="more-panel">
@@ -58,11 +51,12 @@
       {% set when = it.published_at or it.fetched_at %}
       {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
       <span class="liked" {{ 'hidden' if it.interest != 1 }}>★ Interested</span>
+      {% if it.article_status != 'ok' %}<span class="external">opens website ↗</span>{% endif %}
     </div>
     {% if it.article_status == 'ok' %}
-    <h3 class="headline"><a href="/read/{{ it.story_id }}">{{ it.title }}</a></h3>
+    <h3 class="headline"><a class="card-link" href="/read/{{ it.story_id }}">{{ it.title }}</a></h3>
     {% else %}
-    <h3 class="headline"><a href="{{ it.url }}" target="_blank" rel="noopener noreferrer">{{ it.title }}</a></h3>
+    <h3 class="headline"><a class="card-link" href="{{ it.url }}" target="_blank" rel="noopener noreferrer">{{ it.title }}</a></h3>
     {% endif %}
     {% if it.summary %}<p class="summary">{{ it.summary }}</p>{% endif %}
     {% if it.also_list %}
@@ -70,7 +64,7 @@
       {%- for a in it.also_list %} <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.source }}</a>{{ "," if not loop.last }}{% endfor %}
     </p>
     {% endif %}
-    {{ story_actions(it, back, True) }}
+    {{ story_actions(it, back) }}
   </div>
 </article>
 {%- endmacro %}
