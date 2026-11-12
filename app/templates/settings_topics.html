@@ -1,0 +1,35 @@
+{% extends "_settings.html" %}
+{% block settings %}
+<p class="muted">Each topic is a section of the paper. Keywords lift matching stories within the section; importance (1–5) decides how strongly the section's stories compete for the front page; story count is how many regular stories it gets (plus one wildcard).</p>
+{% for t in topics %}
+<section class="panel {{ 'is-off' if not t.enabled }}">
+  <form method="post" action="/settings/topics/{{ t.id }}" class="grid-form">
+    <label>Name <input name="name" value="{{ t.name }}" required maxlength="60"></label>
+    <label class="wide">Keywords (comma separated)
+      <textarea name="keywords" rows="2">{{ t.keywords }}</textarea></label>
+    <label>Importance <input name="importance" type="number" min="1" max="5" value="{{ t.importance }}"></label>
+    <label>Stories <input name="story_count" type="number" min="1" max="20" value="{{ t.story_count }}"></label>
+    <label>Order <input name="position" type="number" min="0" max="99" value="{{ t.position }}"></label>
+    <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if t.enabled }}> Show this section</label>
+    <div class="wide row">
+      <button class="btn btn-primary" type="submit">Save</button>
+      <span class="small muted grow">{{ t.feed_count }} source{{ 's' if t.feed_count != 1 }}</span>
+    </div>
+  </form>
+  <form method="post" action="/settings/topics/{{ t.id }}/delete" class="inline-form">
+    <button class="btn btn-small btn-danger" type="submit" {{ 'disabled' if t.feed_count }}>Delete topic</button>
+  </form>
+</section>
+{% endfor %}
+<section class="panel">
+  <h2>Add a topic</h2>
+  <form method="post" action="/settings/topics" class="grid-form">
+    <label>Name <input name="name" required maxlength="60"></label>
+    <label class="wide">Keywords (comma separated) <textarea name="keywords" rows="2"></textarea></label>
+    <label>Importance <input name="importance" type="number" min="1" max="5" value="3"></label>
+    <label>Stories <input name="story_count" type="number" min="1" max="20" value="6"></label>
+    <label>Order <input name="position" type="number" min="0" max="99" value="{{ topics|length }}"></label>
+    <div class="wide"><button class="btn btn-primary" type="submit">Add topic</button></div>
+  </form>
+</section>
+{% endblock %}

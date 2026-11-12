@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_card.html" import card %}
+{% from "_weather.html" import weather_box %}
+{% block title %}{{ ed_date | long_date }} · {{ paper_name }}{% endblock %}
+{% block head %}{% if building %}<noscript><meta http-equiv="refresh" content="10"></noscript>{% endif %}{% endblock %}
+{% block body_class %}page-edition{% endblock %}
+{% block main %}
+<header class="masthead">
+  <a class="arrow {{ 'disabled' if not prev_date }}" {% if prev_date %}href="/edition/{{ prev_date }}" rel="prev"{% else %}aria-disabled="true"{% endif %} aria-label="Earlier edition">‹<span class="arrow-text"> Earlier</span></a>
+  <div class="masthead-centre">
+    <h1 class="masthead-title">{{ paper_name }}</h1>
+    <p class="masthead-date">{{ ed_date | long_date }}{% if weather.location %} · {{ weather.location.name }}{% endif %}</p>
+  </div>
+  <a class="arrow {{ 'disabled' if not next_date }}" {% if next_date %}href="/edition/{{ next_date }}" rel="next"{% else %}aria-disabled="true"{% endif %} aria-label="Later edition"><span class="arrow-text">Later </span>›</a>
+</header>
+
+{% if data.offline %}
+<div class="banner banner-warn" role="status">Offline edition: none of your sources could be reached when this was built, so it was made from stories saved earlier.</div>
+{% elif data.failed_sources %}
+<p class="sources-note small muted">{{ data.failed_sources | length }} source{{ 's' if data.failed_sources|length != 1 }} couldn't be reached for this edition ({{ data.failed_sources | join(', ') }}). <a href="/settings/sources">Details</a></p>
+{% endif %}
+{% if not is_today and is_latest %}
+<p class="sources-note small">This is the most recent edition. Today's is built at the scheduled time, or you can <a href="#rebuild">rebuild now</a>.</p>
+{% endif %}
+
+<div class="front">
+  <section class="leads" aria-labelledby="lead-h">
+    <h2 id="lead-h" class="sr">Top stories</h2>
+    {% for it in leads %}{{ card(it, ed_date, path, 'card-lead' if loop.first else 'card-sublead') }}{% endfor %}
+    {% if not leads %}<p class="muted">No stories made it into this edition. Check your sources in Settings.</p>{% endif %}
+  </section>
+  <aside class="sidebar">{{ weather_box(weather, ed_date) }}</aside>
+</div>
+
+{% for sec in sections %}
+<section class="section" aria-labelledby="sec-{{ loop.index }}">
+  <h2 class="section-title" id="sec-{{ loop.index }}">{{ sec.name }}</h2>
+  <div class="columns">
+    {% for it in sec["items"] %}{{ card(it, ed_date, path) }}{% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+<section class="section onthisday" aria-labelledby="otd-h">
+  <h2 class="section-title" id="otd-h">On this day · {{ ed_date.day }} {{ ed_date.strftime('%B') }}</h2>
+  {% if onthisday['items'] %}
+  <ol class="otd-list columns">
+    {% for e in onthisday['items'] %}
+    <li><span class="otd-year">{{ e.year }}</span>
+      {% if e.link %}<a href="{{ e.link }}" target="_blank" rel="noopener noreferrer">{{ e.text }}</a>{% else %}{{ e.text }}{% endif %}</li>
+    {% endfor %}
+  </ol>
+  <p class="small muted">From Wikipedia's selected anniversaries.</p>
+  {% else %}
+  <p class="muted">Couldn't load “On this day” from Wikipedia for this edition.</p>
+  {% endif %}
+</section>
+
+<footer class="edition-footer" id="rebuild">
+  <p class="small muted">Built {{ built_at.strftime('%A %-d %B at %-I:%M %p') if built_at }}{% if data.reason %} ({{ data.reason }}){% endif %}.
+    Story labels (Reporting / Analysis / Opinion) are best guesses from feed data and web addresses; tap “Label” on a story to correct one.</p>
+  {% if is_latest %}
+  <form method="post" action="/rebuild" class="js-rebuild">
+    <button class="btn" type="submit" {{ 'disabled' if building }}>{{ 'Building…' if building else 'Rebuild now' }}</button>
+  </form>
+  {% endif %}
+</footer>
+{% endblock %}

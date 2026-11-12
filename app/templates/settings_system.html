@@ -1,0 +1,34 @@
+{% extends "_settings.html" %}
+{% block settings %}
+<section class="panel">
+  <h2>Editions</h2>
+  {% if latest %}
+  <p>Latest edition: <a href="/edition/{{ latest.date }}">{{ latest.date | long_date }}</a>, built {{ latest.built_at | fmt_time }}{% if latest_data.build_seconds is defined %} in {{ latest_data.build_seconds }} s{% endif %}.</p>
+  {% set st = latest_data.stats or {} %}{% set fe = latest_data.fetch or {} %}
+  <p class="small muted">Sources OK: {{ fe.ok }} · failed: {{ fe.failed }} · new stories: {{ fe.new_stories }} · candidates: {{ st.candidates }} · excluded: {{ st.excluded }} · duplicates merged: {{ st.merged }} · repeats skipped: {{ st.repeats }} · selected: {{ st.selected }}</p>
+  {% else %}<p>No edition built yet.</p>{% endif %}
+  {% if build_error %}<p class="note note-warn">Last build failed {{ build_error.at | fmt_time }}: {{ build_error.error }}</p>{% endif %}
+  <p class="small">Daily build: {{ next_build.strftime('%A %-d %B, %-I:%M %p') if next_build else 'scheduler not running' }} ({{ tz_name }}).</p>
+  <form method="post" action="/rebuild" class="inline-form"><button class="btn" type="submit">Rebuild now</button></form>
+</section>
+<section class="panel">
+  <h2>Backups</h2>
+  <p>The database is backed up every night at 2:30 am. The newest {{ keep }} are kept, in <code>/data/backups</code> inside the container.</p>
+  {% if last_backup %}
+    {% if last_backup.ok %}<p class="small">Last backup: {{ last_backup.at | fmt_time }} ({{ last_backup.file }}).</p>
+    {% else %}<p class="note note-warn">Last backup failed {{ last_backup.at | fmt_time }}: {{ last_backup.error }}</p>{% endif %}
+  {% endif %}
+  <form method="post" action="/settings/backup" class="inline-form"><button class="btn btn-primary" type="submit">Back up now</button></form>
+  {% if backups %}
+  <ul class="backups">{% for b in backups %}
+    <li><span class="grow">{{ b.when.strftime('%a %-d %b %Y, %-I:%M %p') }} <span class="small muted">{{ (b.size / 1024) | round | int }} KB</span></span>
+      <a class="btn btn-small" href="/settings/backups/{{ b.name }}" download>Download</a></li>
+  {% endfor %}</ul>
+  {% else %}<p class="muted">No backups yet.</p>{% endif %}
+  <p class="small muted">Database size: {{ (db_size / 1024) | round | int }} KB. Restore steps are in the README.</p>
+</section>
+<section class="panel">
+  <h2>About</h2>
+  <p class="small">Weather: Open-Meteo. Warnings: <a href="{{ alert_url }}" target="_blank" rel="noopener noreferrer">{{ alert_url }}</a> (Bureau of Meteorology). On this day: Wikipedia.</p>
+</section>
+{% endblock %}

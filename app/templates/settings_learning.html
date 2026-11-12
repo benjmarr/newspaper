@@ -1,0 +1,43 @@
+{% extends "_settings.html" %}
+{% block settings %}
+<section class="panel">
+  <h2>What the paper has learned</h2>
+  <p>Each “Interested” or “Not interested” tap nudges the words in that headline and the story's source up or down. Everything fades by {{ ((1 - decay) * 100) | round | int }}% with each new edition, so old taps matter less over time. You've given feedback on {{ taps }} stor{{ 'y' if taps == 1 else 'ies' }}; {{ hidden }} hidden.</p>
+</section>
+<div class="two-col">
+  <section class="panel">
+    <h3>Words you like</h3>
+    {% if not liked %}<p class="muted">Nothing yet.</p>{% endif %}
+    <ul class="weights">{% for t in liked %}
+      <li><span class="grow">{{ t.term }}</span><span class="w w-pos">+{{ '%.1f' | format(t.weight) }}</span>
+        <form method="post" action="/settings/learning/forget-term"><input type="hidden" name="term" value="{{ t.term }}"><button class="btn btn-small" type="submit">Forget</button></form></li>
+    {% endfor %}</ul>
+  </section>
+  <section class="panel">
+    <h3>Words you avoid</h3>
+    {% if not disliked %}<p class="muted">Nothing yet.</p>{% endif %}
+    <ul class="weights">{% for t in disliked %}
+      <li><span class="grow">{{ t.term }}</span><span class="w w-neg">{{ '%.1f' | format(t.weight) }}</span>
+        <form method="post" action="/settings/learning/forget-term"><input type="hidden" name="term" value="{{ t.term }}"><button class="btn btn-small" type="submit">Forget</button></form></li>
+    {% endfor %}</ul>
+  </section>
+</div>
+<section class="panel">
+  <h3>Sources</h3>
+  {% if not sources %}<p class="muted">No source preferences yet.</p>{% endif %}
+  <ul class="weights">{% for s in sources %}
+    <li><span class="grow">{{ s.name }}</span><span class="w {{ 'w-pos' if s.weight > 0 else 'w-neg' }}">{{ '%+.1f' | format(s.weight) }}</span>
+      <form method="post" action="/settings/learning/forget-source"><input type="hidden" name="feed_id" value="{{ s.feed_id }}"><button class="btn btn-small" type="submit">Forget</button></form></li>
+  {% endfor %}</ul>
+</section>
+<section class="panel">
+  <h3>Start over</h3>
+  <form method="post" action="/settings/learning/reset" class="stack">
+    <label class="check"><input type="checkbox" name="confirm" value="yes" required> Yes, forget everything learned</label>
+    <button class="btn btn-danger" type="submit">Reset learning</button>
+  </form>
+  {% if hidden %}
+  <form method="post" action="/settings/learning/unhide" class="inline-form"><button class="btn btn-small" type="submit">Un-hide stories left over from a reset</button></form>
+  {% endif %}
+</section>
+{% endblock %}

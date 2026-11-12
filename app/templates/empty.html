@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body_class %}page-empty{% endblock %}
+{% block head %}<noscript><meta http-equiv="refresh" content="10"></noscript>{% endblock %}
+{% block main %}
+<div class="empty">
+  <h1 class="masthead-title">{{ paper_name }}</h1>
+  <p>Your first edition is being put together. This usually takes under a minute.</p>
+  <p class="muted">The page refreshes by itself.</p>
+</div>
+{% endblock %}

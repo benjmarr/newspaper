@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ paper_name }}{% endblock %}
+{% block build_hint %}You can keep using Settings while it runs.{% endblock %}
+{% block main %}
+<div class="page settings">
+  <h1>Settings</h1>
+  <nav class="tabs" aria-label="Settings sections">
+    {% for key, label in [('general','General'),('topics','Topics'),('sources','Sources'),('exclusions','Exclusions'),('learning','Learning'),('system','Backups & system')] %}
+    <a class="tab {{ 'active' if tab == key }}" href="/settings/{{ key }}" {{ 'aria-current=page' if tab == key }}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% block settings %}{% endblock %}
+</div>
+{% endblock %}

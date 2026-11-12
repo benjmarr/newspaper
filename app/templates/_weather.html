@@ -1,0 +1,64 @@
+{% macro weather_box(w, ed_date) -%}
+<section class="weather" aria-labelledby="wx-h">
+  <h2 id="wx-h" class="box-title">Weather{% if w.location %} · {{ w.location.name }}{% endif %}</h2>
+  {% if w.today %}
+    {% if w.stale %}
+      <p class="note note-warn">Showing the last saved forecast, as of {{ w.as_of.strftime('%a %-d %b, %-I:%M %p') if w.as_of else 'unknown' }}. A fresh one couldn't be fetched.</p>
+    {% endif %}
+    <div class="wx-now">
+      {% if w.current %}
+      <span class="wx-icon" aria-hidden="true">{{ w.current.icon }}</span>
+      <span class="wx-temp">{{ w.current.temp | num }}°</span>
+      <span class="wx-desc">{{ w.current.desc }}<br><span class="small muted">Feels like {{ w.current.feels | num }}°</span></span>
+      {% else %}
+      <span class="wx-icon" aria-hidden="true">{{ w.today.icon }}</span>
+      <span class="wx-desc">{{ w.today.desc }}</span>
+      {% endif %}
+    </div>
+    <dl class="wx-facts">
+      <div><dt>High / low</dt><dd>{{ w.today.max | num }}° / {{ w.today.min | num }}°</dd></div>
+      <div><dt>Rain</dt><dd>{{ w.today.rain_chance | num }}% · {{ w.today.rain_mm | num(1) }} mm</dd></div>
+      <div><dt>Wind</dt><dd>{{ w.today.wind_dir }} {{ w.today.wind | num }} km/h, gusts {{ w.today.gusts | num }}</dd></div>
+      <div><dt>UV max</dt><dd>{{ w.today.uv | num }}</dd></div>
+      <div><dt>Sunrise</dt><dd>{{ w.today.sunrise }}</dd></div>
+      <div><dt>Sunset</dt><dd>{{ w.today.sunset }}</dd></div>
+    </dl>
+    {% if w.chips %}
+    <div class="chips" aria-label="Heads-up from the forecast">
+      <span class="chips-label small muted">From the forecast:</span>
+      {% for c in w.chips %}<span class="chip chip-{{ c.kind }}">{{ c.text }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {% if w.outlook %}
+    <ol class="outlook" aria-label="Five-day outlook">
+      {% for d in w.outlook %}
+      <li><span class="o-dow">{{ d.dow }}</span><span class="o-icon" aria-hidden="true">{{ d.icon }}</span>
+        <span class="o-temps">{{ d.max | num }}° <span class="muted">{{ d.min | num }}°</span></span>
+        <span class="o-rain small">{{ d.rain_chance | num }}%</span>
+        <span class="sr">{{ d.desc }}</span></li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+    <p class="small muted">Forecast: Open-Meteo{% if w.as_of and not w.stale %}, updated {{ w.as_of.strftime('%-I:%M %p').lower() }}{% endif %}.</p>
+  {% else %}
+    <p class="note note-warn">No forecast available yet{% if w.error %} (the last attempt failed){% endif %}. Check the location in Settings.</p>
+  {% endif %}
+
+  <div class="warnings">
+    <h3 class="small-title">Official warnings</h3>
+    {% if not w.warnings_known %}
+      <p class="note note-warn">Warnings haven't been fetched yet.</p>
+    {% elif not w.warnings_ok %}
+      <p class="note note-warn">Couldn't fetch warnings from the Bureau of Meteorology{% if w.warnings_as_of %} (last good list from {{ w.warnings_as_of.strftime('%a %-I:%M %p') }}){% endif %}. Check <a href="{{ w.warnings_page }}" target="_blank" rel="noopener noreferrer">bom.gov.au</a> directly.</p>
+    {% endif %}
+    {% if w.warnings %}
+      <ul class="warn-list">
+      {% for x in w.warnings[:8] %}<li><a href="{{ x.link }}" target="_blank" rel="noopener noreferrer">{{ x.title }}</a></li>{% endfor %}
+      </ul>
+    {% elif w.warnings_ok %}
+      <p class="small">No current warnings for Victoria.</p>
+    {% endif %}
+    <p class="small muted">Source: <a href="{{ w.warnings_page }}" target="_blank" rel="noopener noreferrer">Australian Bureau of Meteorology</a>. Always check the BoM for the latest.</p>
+  </div>
+</section>
+{%- endmacro %}

@@ -1,0 +1,57 @@
+{% macro card(it, ed_date, path, size='') -%}
+{% set back = (path ~ '#story-' ~ it.story_id) | urlencode %}
+<article class="card {{ size }} {{ 'is-hidden' if it.interest == -1 }}" id="story-{{ it.story_id }}" data-story="{{ it.story_id }}">
+  <div class="hidden-note">
+    <span>Hidden: “{{ it.title }}”</span>
+    <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
+      <input type="hidden" name="value" value="not_interested">
+      <button class="btn btn-small" type="submit">Undo</button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="meta">
+      <span class="label label-{{ it.label }}" title="Best guess from feed data">{{ label_names[it.label] }}{% if it.label_corrected %}*{% endif %}</span>
+      {% if it.wildcard %}<span class="label label-wild">Wildcard</span>{% endif %}
+      <span class="source">{{ it.source }}</span>
+      {% set when = it.published_at or it.fetched_at %}
+      {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
+    </div>
+    <h3 class="headline"><a href="{{ it.url }}" target="_blank" rel="noopener noreferrer">{{ it.title }}</a></h3>
+    {% if it.summary %}<p class="summary">{{ it.summary }}</p>{% endif %}
+    {% if it.also_list %}
+    <p class="also">Also reported by
+      {%- for a in it.also_list %} <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.source }}</a>{{ "," if not loop.last }}{% endfor %}
+    </p>
+    {% endif %}
+    <div class="actions">
+      <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
+        <input type="hidden" name="value" value="interested">
+        <button class="btn btn-fb fb-yes" type="submit" aria-pressed="{{ 'true' if it.interest == 1 else 'false' }}">Interested</button>
+      </form>
+      <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
+        <input type="hidden" name="value" value="not_interested">
+        <button class="btn btn-fb fb-no" type="submit" aria-pressed="false">Not interested</button>
+      </form>
+      <a class="btn btn-read" href="{{ it.url }}" target="_blank" rel="noopener noreferrer">Read ↗</a>
+      <details class="fix-label">
+        <summary class="btn">Label</summary>
+        <div class="fix-label-panel">
+          <p class="small muted">Labels are best guesses. Correct this one:</p>
+          {% for key in ['reporting', 'analysis', 'opinion'] %}
+          <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
+            <input type="hidden" name="label" value="{{ key }}">
+            <button class="btn btn-small" type="submit" {{ 'aria-pressed=true' if it.label == key }}>{{ label_names[key] }}</button>
+          </form>
+          {% endfor %}
+          {% if it.label_corrected %}
+          <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
+            <input type="hidden" name="label" value="auto">
+            <button class="btn btn-small" type="submit">Use automatic guess</button>
+          </form>
+          {% endif %}
+        </div>
+      </details>
+    </div>
+  </div>
+</article>
+{%- endmacro %}

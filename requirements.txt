@@ -1,0 +1,10 @@
+fastapi==0.162.5
+starlette==1.10.0
+uvicorn==0.54.0
+Jinja2==3.1.6
+python-multipart==0.0.33
+httpx==0.28.1
+feedparser==6.0.14
+APScheduler==3.11.3
+itsdangerous==2.2.0
+tzdata==2025.2

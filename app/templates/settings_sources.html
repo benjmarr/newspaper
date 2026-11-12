@@ -1,0 +1,52 @@
+{% extends "_settings.html" %}
+{% block settings %}
+<section class="panel">
+  <h2>Add a source</h2>
+  <form method="post" action="/settings/sources" class="grid-form">
+    <label class="wide">RSS or Atom feed address <input name="url" type="url" required placeholder="https://example.com/feed"></label>
+    <label>Name (optional) <input name="name" maxlength="80" placeholder="Taken from the feed"></label>
+    <label>Topic
+      <select name="topic_id" required>{% for t in topics %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></label>
+    <label>Priority (1–5) <input name="priority" type="number" min="1" max="5" value="3"></label>
+    <label>Treat stories as
+      <select name="treat_as">{% for o in treat_options %}<option value="{{ o }}">{{ 'Detect automatically' if o == 'auto' else label_names[o] }}</option>{% endfor %}</select></label>
+    <div class="wide"><button class="btn btn-primary" type="submit">Check and add</button>
+      <span class="small muted">The feed is fetched once to check it works.</span></div>
+  </form>
+</section>
+
+<h2>Your sources</h2>
+{% for f in feeds %}
+{% set failing = f.consecutive_failures > 0 %}
+<section class="panel source {{ 'is-off' if f.paused }} {{ 'is-failing' if failing and not f.paused }}">
+  <div class="source-head">
+    <h3>{{ f.name }}</h3>
+    <span class="status {{ 'st-paused' if f.paused else ('st-bad' if failing else ('st-ok' if f.last_ok_at else 'st-new')) }}">
+      {{ 'Paused' if f.paused else ('Failing' if failing else ('OK' if f.last_ok_at else 'Not fetched yet')) }}</span>
+  </div>
+  <p class="small url">{{ f.url }}</p>
+  <p class="small">
+    {% if f.last_ok_at %}Last success: {{ f.last_ok_at | fmt_time }}{% if f.last_item_count is not none %} ({{ f.last_item_count }} items){% endif %}.{% endif %}
+    {% if f.last_error %}<br><span class="{{ 'err-text' if failing }}">Last error{% if f.last_error_at %} ({{ f.last_error_at | fmt_time }}){% endif %}: {{ f.last_error }}</span>
+      {% if failing %} · failed {{ f.consecutive_failures }} time{{ 's' if f.consecutive_failures != 1 }} in a row{% endif %}{% endif %}
+  </p>
+  <form method="post" action="/settings/sources/{{ f.id }}" class="grid-form">
+    <label>Name <input name="name" value="{{ f.name }}" maxlength="80" required></label>
+    <label>Topic
+      <select name="topic_id">{% for t in topics %}<option value="{{ t.id }}" {{ 'selected' if t.id == f.topic_id }}>{{ t.name }}</option>{% endfor %}</select></label>
+    <label>Priority <input name="priority" type="number" min="1" max="5" value="{{ f.priority }}"></label>
+    <label>Treat as
+      <select name="treat_as">{% for o in treat_options %}<option value="{{ o }}" {{ 'selected' if o == f.treat_as }}>{{ 'Detect automatically' if o == 'auto' else label_names[o] }}</option>{% endfor %}</select></label>
+    <div class="wide"><button class="btn btn-primary" type="submit">Save</button></div>
+  </form>
+  <div class="row">
+    <form method="post" action="/settings/sources/{{ f.id }}/pause"><button class="btn btn-small" type="submit">{{ 'Resume' if f.paused else 'Pause' }}</button></form>
+    <form method="post" action="/settings/sources/{{ f.id }}/test"><button class="btn btn-small" type="submit">Test now</button></form>
+    <details class="confirm">
+      <summary class="btn btn-small btn-danger">Remove…</summary>
+      <form method="post" action="/settings/sources/{{ f.id }}/delete"><button class="btn btn-small btn-danger" type="submit">Yes, remove {{ f.name }}</button></form>
+    </details>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

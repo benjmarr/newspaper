@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} · {{ paper_name }}{% endblock %}
+{% block main %}
+<div class="empty">
+  <h1>{{ "Not found" if code == 404 else "Something went wrong" }}</h1>
+  <p>{{ detail }}</p>
+  <p><a class="btn" href="/">Back to today's paper</a></p>
+</div>
+{% endblock %}

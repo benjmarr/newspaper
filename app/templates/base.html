@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block title %}{{ paper_name }}{% endblock %}</title>
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f3ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16140f" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="{{ paper_name }}">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="/static/style.css?v=2">
+{% block head %}{% endblock %}
+<script src="/static/app.js?v=2" defer></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip" href="#main">Skip to content</a>
+{% block topbar %}
+<nav class="topbar" aria-label="Main">
+  <a class="brand" href="/">{{ paper_name }}</a>
+  <span class="spacer"></span>
+  <a class="navlink {{ 'active' if path == '/' or path.startswith('/edition') }}" href="/">Today</a>
+  <a class="navlink {{ 'active' if path == '/archive' }}" href="/archive">Archive</a>
+  <a class="navlink {{ 'active' if path.startswith('/settings') }}" href="/settings">Settings</a>
+</nav>
+{% endblock %}
+{% if building %}
+<div class="banner banner-build" role="status" data-building="1">
+  <span class="spinner" aria-hidden="true"></span>
+  Building a fresh edition… {% block build_hint %}This page will refresh when it's ready.{% endblock %}
+</div>
+{% endif %}
+{% if msg %}<div class="banner banner-ok" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="banner banner-err" role="alert">{{ err }}</div>{% endif %}
+<main id="main">
+{% block main %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{% extends "_settings.html" %}
+{% block settings %}
+<section class="panel">
+  <h2>Daily edition</h2>
+  <form method="post" action="/settings/general" class="stack">
+    <label for="bt">Build the paper every day at</label>
+    <input id="bt" name="build_time" type="time" value="{{ build_time }}" required>
+    <p class="small muted">Time zone: {{ tz_name }}. {% if next_build %}Next build: {{ next_build.strftime('%A %-d %B, %-I:%M %p') }}.{% endif %}</p>
+    <label for="ma">Only use stories published in the last (hours)</label>
+    <input id="ma" name="max_age_hours" type="number" min="6" max="168" value="{{ max_age }}">
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+  <form method="post" action="/rebuild" class="inline-form"><button class="btn" type="submit">Rebuild today's edition now</button></form>
+</section>
+
+<section class="panel">
+  <h2>Weather location</h2>
+  <p>Currently: <strong>{{ location.name }}</strong>{% if location.admin1 %}, {{ location.admin1 }}{% endif %}{% if location.country %}, {{ location.country }}{% endif %}
+    <span class="small muted">({{ location.latitude }}, {{ location.longitude }})</span></p>
+  <form method="get" action="/settings/general" class="row">
+    <label class="sr" for="q">Search for a place</label>
+    <input id="q" name="q" type="search" value="{{ q }}" placeholder="Place name, e.g. Port Fairy" required>
+    <button class="btn" type="submit">Search</button>
+  </form>
+  {% if search_error %}<p class="note note-warn">{{ search_error }}</p>{% endif %}
+  {% if q and not results and not search_error %}<p class="muted">No places found for “{{ q }}”.</p>{% endif %}
+  {% if results %}
+  <ul class="results">
+    {% for r in results %}
+    <li>
+      <form method="post" action="/settings/location" class="row">
+        {% for k in ['name','admin1','country','latitude','longitude'] %}<input type="hidden" name="{{ k }}" value="{{ r[k] }}">{% endfor %}
+        <span class="grow">{{ r.name }}{% if r.admin1 %}, {{ r.admin1 }}{% endif %}{% if r.country %}, {{ r.country }}{% endif %}
+          <span class="small muted">({{ r.latitude }}, {{ r.longitude }})</span></span>
+        <button class="btn btn-small" type="submit">Use this</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <p class="small muted">Weather warnings always come from the Bureau of Meteorology feed set in ALERT_FEED_URL (Victoria by default).</p>
+</section>
+
+<section class="panel">
+  <h2>Sign out</h2>
+  <form method="post" action="/logout"><button class="btn" type="submit">Sign out of this device</button></form>
+</section>
+{% endblock %}

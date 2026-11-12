@@ -1,0 +1,35 @@
+services:
+  paper:
+    build: .
+    image: personal-newspaper:latest
+    container_name: newspaper
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Australia/Melbourne}
+    ports:
+      # LAN only: plain HTTP on the host's port PAPER_PORT (default 8080).
+      - "${PAPER_PORT:-8080}:8000"
+    volumes:
+      - paper-data:/data
+    # Hardening
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 200
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  paper-data:
+    # Fixed name so the data survives renaming or moving the project folder.
+    name: newspaper-data

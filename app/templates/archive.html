@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Archive · {{ paper_name }}{% endblock %}
+{% block main %}
+<div class="page">
+<h1>Archive</h1>
+{% if not months %}<p>No editions yet.</p>{% endif %}
+{% for m in months %}
+<section class="archive-month">
+  <h2>{{ m.label }}</h2>
+  <ul class="archive-days">
+  {% for d in m.days %}
+    <li><a class="archive-day" href="/edition/{{ d.date }}">
+      <span class="dow">{{ d.d.strftime('%a') }}</span>
+      <span class="dnum">{{ d.d.day }}</span>
+      <span class="small muted">{{ d.n }} stories{% if d.offline %} · offline{% endif %}</span>
+    </a></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+</div>
+{% endblock %}
