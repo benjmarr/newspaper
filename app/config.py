@@ -29,6 +29,10 @@ class Config:
         return self.data_dir / "paper.db"
 
     @property
+    def image_dir(self) -> Path:
+        return self.data_dir / "images"
+
+    @property
     def backup_dir(self) -> Path:
         return self.data_dir / "backups"
 

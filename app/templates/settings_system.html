@@ -12,6 +12,12 @@
   <form method="post" action="/rebuild" class="inline-form"><button class="btn" type="submit">Rebuild now</button></form>
 </section>
 <section class="panel">
+  <h2>Saved articles</h2>
+  <p>{{ art_ok }} full article{{ 's' if art_ok != 1 }} saved for reading offline ({{ art_total - art_ok }} couldn't be fetched), with {{ img_count }} photo{{ 's' if img_count != 1 }} using {{ (img_bytes / 1048576) | round(1) }} MB. Articles are kept for {{ keep_days }} days (change this in General).</p>
+  {% set ar = latest_data.articles or {} %}
+  {% if ar %}<p class="small muted">Latest build: {{ ar.ok }} saved, {{ ar.failed }} failed, {{ ar.already_saved or 0 }} already saved, {{ ar.images }} photos.</p>{% endif %}
+</section>
+<section class="panel">
   <h2>Backups</h2>
   <p>The database is backed up every night at 2:30 am. The newest {{ keep }} are kept, in <code>/data/backups</code> inside the container.</p>
   {% if last_backup %}
@@ -25,7 +31,7 @@
       <a class="btn btn-small" href="/settings/backups/{{ b.name }}" download>Download</a></li>
   {% endfor %}</ul>
   {% else %}<p class="muted">No backups yet.</p>{% endif %}
-  <p class="small muted">Database size: {{ (db_size / 1024) | round | int }} KB. Restore steps are in the README.</p>
+  <p class="small muted">Database size: {{ (db_size / 1024) | round | int }} KB. Backups include the article text but not the photos (photos are a cache and are fetched again if needed). Restore steps are in the README.</p>
 </section>
 <section class="panel">
   <h2>About</h2>

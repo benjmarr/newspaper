@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from . import feeds as feedmod
-from . import learning, onthisday, ranking, weather
+from . import articles, learning, onthisday, ranking, weather
 from .config import Config
 from .db import Database, iso, utcnow
 
@@ -21,12 +21,14 @@ HISTORY_DAYS = 10
 
 class Builder:
     def __init__(self, db: Database, config: Config, client_factory=feedmod.default_client,
-                 weather_client=None, onthisday_client=None):
+                 weather_client=None, onthisday_client=None, article_client=articles.default_client):
         self.db = db
         self.config = config
         self.client_factory = client_factory
         self.weather_client = weather_client      # callables returning httpx.Client, for tests
         self.onthisday_client = onthisday_client
+        self.article_client = article_client
+        self.phase: str | None = None
         self._lock = threading.Lock()
         self.started_at: datetime | None = None
         self.last_error: str | None = None
@@ -61,10 +63,12 @@ class Builder:
             return None
         finally:
             self.started_at = None
+            self.phase = None
             self._lock.release()
 
     def _build(self, day: date, reason: str) -> dict[str, Any]:
         log.info("Building edition for %s (%s)", day, reason)
+        self.phase = "Fetching the news…"
         db = self.db
         now = utcnow()
         learning.decay(db, day.isoformat())
@@ -133,9 +137,33 @@ class Builder:
             c.execute("DELETE FROM stories WHERE fetched_at < ? AND id NOT IN (SELECT story_id FROM edition_items) "
                       "AND id NOT IN (SELECT story_id FROM shown)", (iso(now - timedelta(days=30)),))
         db.set_setting("last_build_error", None)
+
+        # Phase 2: copy full articles and their photos to local storage for the reader view.
+        if not offline:
+            self.phase = "Saving full articles and photos…"
+            data["articles"] = self.fetch_articles([i["story_id"] for i in selection.items])
+            with db.conn() as c:
+                c.execute("UPDATE editions SET data = ? WHERE id = ?", (json.dumps(data), edition_id))
+        try:
+            data["cleanup"] = articles.cleanup(db, self.config.image_dir,
+                                               int(db.get_setting("article_keep_days", 60)))
+        except Exception:
+            log.exception("Article clean-up failed")
         log.info("Edition %s built: %s stories, %s/%s feeds ok%s", day, len(selection.items), counts["ok"],
                  len(active), " (OFFLINE)" if offline else "")
         return {"date": day.isoformat(), "edition_id": edition_id, **data}
+
+    def fetch_articles(self, story_ids: list[int]) -> dict[str, int]:
+        """Fetch and store full text and photos for these stories. Never raises."""
+        try:
+            todo = articles.stories_needing_fetch(self.db, story_ids)
+            stats = asyncio.run(articles.fetch_many(self.db, todo, self.config.image_dir, self.article_client))
+            stats["already_saved"] = len(story_ids) - len(todo)
+            log.info("Articles: %s", stats)
+            return stats
+        except Exception as exc:
+            log.exception("Article fetching failed")
+            return {"ok": 0, "failed": len(story_ids), "images": 0, "error": type(exc).__name__}
 
     def needs_catch_up(self) -> bool:
         """True if today's edition is missing and today's build time has already passed."""

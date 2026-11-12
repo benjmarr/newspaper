@@ -8,6 +8,9 @@
     <p class="small muted">Time zone: {{ tz_name }}. {% if next_build %}Next build: {{ next_build.strftime('%A %-d %B, %-I:%M %p') }}.{% endif %}</p>
     <label for="ma">Only use stories published in the last (hours)</label>
     <input id="ma" name="max_age_hours" type="number" min="6" max="168" value="{{ max_age }}">
+    <label for="kd">Keep full articles and photos for (days)</label>
+    <input id="kd" name="article_keep_days" type="number" min="3" max="365" value="{{ keep_days }}">
+    <p class="small muted">After this, older editions still show their story cards, but “Read” goes to the original website.</p>
     <button class="btn btn-primary" type="submit">Save</button>
   </form>
   <form method="post" action="/rebuild" class="inline-form"><button class="btn" type="submit">Rebuild today's edition now</button></form>

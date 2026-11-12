@@ -8,3 +8,5 @@ feedparser==6.0.14
 APScheduler==3.11.3
 itsdangerous==2.2.0
 tzdata==2025.2
+trafilatura==2.3.1
+Pillow==13.0.0

@@ -72,6 +72,8 @@ class MockWeb:
         self.weather_down = False
         self.bom_down = False
         self.wiki_down = False
+        self.pages: dict[str, str] = {}     # article pages
+        self.images: dict[str, bytes] = {}  # image files
 
     def _count(self, url: str) -> None:
         self.calls[url] = self.calls.get(url, 0) + 1
@@ -90,6 +92,10 @@ class MockWeb:
             return httpx.Response(200, text="<html><body>not a feed")
         if url in self.feeds:
             return httpx.Response(200, text=self.feeds[url], headers={"content-type": "application/rss+xml"})
+        if url in self.pages:
+            return httpx.Response(200, text=self.pages[url], headers={"content-type": "text/html; charset=utf-8"})
+        if url in self.images:
+            return httpx.Response(200, content=self.images[url], headers={"content-type": "image/jpeg"})
         return httpx.Response(404)
 
     def api_handler(self, request: httpx.Request) -> httpx.Response:
@@ -136,6 +142,7 @@ def app(config, web):
         "client_factory": lambda: httpx.AsyncClient(transport=httpx.MockTransport(web.feed_handler)),
         "weather_client": lambda: httpx.Client(transport=httpx.MockTransport(web.api_handler)),
         "onthisday_client": lambda: httpx.Client(transport=httpx.MockTransport(web.api_handler)),
+        "article_client": lambda: httpx.AsyncClient(transport=httpx.MockTransport(web.feed_handler)),
     }
     application = create_app(config, builder_kwargs=kwargs)
     db = application.state.db

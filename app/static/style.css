@@ -236,3 +236,21 @@ label { font-family: var(--sans); font-size: 15px; }
 .archive-days { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
 .archive-day { display: flex; flex-direction: column; align-items: center; min-height: 96px; justify-content: center; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); text-decoration: none; font-family: var(--sans); }
 .archive-day .dnum { font-size: 1.8rem; font-weight: 800; font-family: var(--serif); }
+
+/* Reader view */
+.reader-nav { max-width: 760px; margin: 12px auto 8px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.reader { max-width: 760px; margin: 0 auto; padding: 20px 24px 14px; }
+.reader-title { font-size: clamp(1.7rem, 4vw, 2.4rem); margin: 10px 0 6px; }
+.byline { font-family: var(--sans); font-size: 15px; color: var(--muted); margin: 0 0 12px; }
+.reader-body { font-size: 1.1rem; line-height: 1.65; }
+.reader-body p, .reader-body li { margin: 0 0 1em; }
+.reader-body h2, .reader-body h3, .reader-body h4 { margin: 1.4em 0 0.5em; }
+.reader-body blockquote { margin: 1em 0; padding-left: 16px; border-left: 3px solid var(--rule); font-style: italic; }
+.reader-body img, .lead-photo img { display: block; max-width: 100%; height: auto; border-radius: 6px; margin: 1em auto; }
+.reader-body figure, .lead-photo { margin: 1em 0; }
+.reader-body figcaption { font-family: var(--sans); font-size: 14px; color: var(--muted); }
+.reader-body pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.85em; }
+.reader-summary { font-size: 1.15rem; }
+.reader-note { border-top: 1px solid var(--rule); padding-top: 8px; }
+.reader-foot { max-width: 760px; margin: 16px auto; }
+.btn-read.btn-primary { color: var(--paper); }

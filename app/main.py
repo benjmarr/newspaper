@@ -15,8 +15,9 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
-from . import backup, learning, text, weather
+from . import articles, backup, learning, text, weather
 from . import feeds as feedmod
 from .auth import COOKIE, MAX_AGE, Auth, load_secret
 from .config import Config, load_config
@@ -86,6 +87,7 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         ctx.setdefault("msg", request.query_params.get("msg", "")[:300])
         ctx.setdefault("err", request.query_params.get("err", "")[:300])
         ctx["building"] = builder.building
+        ctx["build_phase"] = builder.phase
         ctx["path"] = request.url.path
         return templates.TemplateResponse(request, name, ctx, status_code=status)
 
@@ -204,8 +206,9 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         ed_date = date.fromisoformat(ed_row["date"])
         items = [dict(r) for r in db.query(
             "SELECT i.*, s.title, s.url, s.summary, s.published_at, s.fetched_at, s.label_auto, s.label_override, "
-            "s.interest, s.feed_id, COALESCE(f.name, s.source_name) AS source, f.treat_as "
+            "s.interest, s.feed_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, a.status AS article_status "
             "FROM edition_items i JOIN stories s ON s.id = i.story_id LEFT JOIN feeds f ON f.id = s.feed_id "
+            "LEFT JOIN articles a ON a.story_id = s.id "
             "WHERE i.edition_id = ? ORDER BY i.section = 'lead' DESC, i.position", (ed_row["id"],))]
         also_ids = {sid for it in items for sid in json.loads(it["also"])}
         also_rows = {}
@@ -314,6 +317,62 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                 raise HTTPException(404)
         return back(request, f"/#story-{story_id}")
 
+    # --- reader view -----------------------------------------------------
+    @app.get("/read/{story_id}", response_class=HTMLResponse)
+    def read_story(request: Request, story_id: int):
+        row = db.query_one(
+            "SELECT s.*, s.id AS story_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, "
+            "a.status AS article_status, a.body, a.byline, a.lead_image, a.words, a.error AS article_error, "
+            "a.fetched_at AS article_fetched_at FROM stories s LEFT JOIN feeds f ON f.id = s.feed_id "
+            "LEFT JOIN articles a ON a.story_id = s.id WHERE s.id = ?", (story_id,))
+        if row is None:
+            raise HTTPException(404, "That story isn't stored any more.")
+        it = dict(row)
+        it["label"] = effective_label(it)
+        it["label_corrected"] = it.get("label_override") in text.LABELS
+        placed = db.query_one(
+            "SELECT e.date, i.also, i.wildcard FROM edition_items i JOIN editions e ON e.id = i.edition_id "
+            "WHERE i.story_id = ? ORDER BY e.date DESC LIMIT 1", (story_id,))
+        it["also_list"], it["wildcard"] = [], 0
+        ed_date = builder.today()
+        back_url = f"/#story-{story_id}"
+        if placed:
+            ed_date = date.fromisoformat(placed["date"])
+            it["wildcard"] = placed["wildcard"]
+            if placed["date"] != latest_date():
+                back_url = f"/edition/{placed['date']}#story-{story_id}"
+            ids = json.loads(placed["also"])
+            if ids:
+                marks = ",".join("?" * len(ids))
+                it["also_list"] = [dict(r) for r in db.query(
+                    f"SELECT s.id, s.url, COALESCE(f.name, s.source_name) AS source FROM stories s "
+                    f"LEFT JOIN feeds f ON f.id = s.feed_id WHERE s.id IN ({marks})", tuple(ids))]
+        return render(request, "read.html", it=it, ed_date=ed_date, back_url=back_url,
+                      body=Markup(it["body"]) if it.get("article_status") == "ok" else None)
+
+    @app.post("/read/{story_id}/fetch")
+    async def fetch_story_now(story_id: int):
+        row = db.query_one("SELECT id, url, title FROM stories WHERE id = ?", (story_id,))
+        if row is None:
+            raise HTTPException(404)
+        await articles.fetch_many(db, [dict(row)], config.image_dir, builder.article_client, overall_timeout=60)
+        status = db.query_one("SELECT status FROM articles WHERE story_id = ?", (story_id,))
+        if status and status["status"] == "ok":
+            return RedirectResponse(f"/read/{story_id}", status_code=303)
+        return RedirectResponse(f"/read/{story_id}?err=" + quote("Still couldn't fetch the full article."),
+                                status_code=303)
+
+    @app.get("/img/{prefix}/{name}")
+    def stored_image(prefix: str, name: str):
+        rel = f"{prefix}/{name}"
+        if not articles.IMAGE_NAME.match(rel):
+            raise HTTPException(404)
+        path = config.image_dir / rel
+        if not path.is_file():
+            raise HTTPException(404)
+        return FileResponse(path, media_type="image/jpeg",
+                            headers={"Cache-Control": "private, max-age=31536000, immutable"})
+
     # --- settings ------------------------------------------------------
     @app.get("/settings")
     def settings_root():
@@ -330,16 +389,18 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         return render(request, "settings_general.html", tab="general",
                       build_time=db.get_setting("build_time", "05:00"),
                       max_age=db.get_setting("max_age_hours", 36),
+                      keep_days=db.get_setting("article_keep_days", 60),
                       location=db.get_setting("location"), q=q, results=results, search_error=search_error,
                       next_build=jobs.next_build(), tz_name=config.tz_name)
 
     @app.post("/settings/general")
-    def save_general(build_time: str = Form(...), max_age_hours: int = Form(36)):
+    def save_general(build_time: str = Form(...), max_age_hours: int = Form(36), article_keep_days: int = Form(60)):
         if not re.fullmatch(r"\d{1,2}:\d{2}", build_time.strip()):
             return redirect_settings("general", err="Build time must look like 05:00")
         hh, mm = parse_build_time(build_time.strip())
         db.set_setting("build_time", f"{hh:02d}:{mm:02d}")
         db.set_setting("max_age_hours", max(6, min(168, max_age_hours)))
+        db.set_setting("article_keep_days", max(3, min(365, article_keep_days)))
         if jobs.scheduler.running:
             jobs.reschedule_build()
         return redirect_settings("general", msg=f"Saved. The paper will be built daily at {hh:02d}:{mm:02d}.")
@@ -536,6 +597,8 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
     @app.get("/settings/system", response_class=HTMLResponse)
     def settings_system(request: Request):
         latest = db.query_one("SELECT * FROM editions ORDER BY date DESC LIMIT 1")
+        img_count, img_bytes = articles.storage_used(config.image_dir)
+        art = db.query_one("SELECT COUNT(*) AS n, SUM(status = 'ok') AS ok FROM articles")
         files = [{"name": p.name, "size": p.stat().st_size,
                   "when": datetime.fromtimestamp(p.stat().st_mtime, config.tz)} for p in backup.list_backups(config)]
         return render(request, "settings_system.html", tab="system", backups=files,
@@ -544,7 +607,9 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                       latest_data=json.loads(latest["data"]) if latest else {},
                       build_error=db.get_setting("last_build_error", None), next_build=jobs.next_build(),
                       tz_name=config.tz_name, alert_url=config.alert_feed_url,
-                      db_size=config.db_path.stat().st_size if config.db_path.exists() else 0)
+                      db_size=config.db_path.stat().st_size if config.db_path.exists() else 0,
+                      img_count=img_count, img_bytes=img_bytes, art_ok=art["ok"] or 0, art_total=art["n"],
+                      keep_days=db.get_setting("article_keep_days", 60))
 
     @app.post("/settings/backup")
     async def backup_now():

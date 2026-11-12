@@ -62,7 +62,11 @@ You need a Linux machine or VM with Docker Engine and the Docker Compose plugin.
 
 **The paper.** The masthead shows the edition's date. Use **‹ Earlier** and **Later ›** to move between editions, or **Archive** to see them all grouped by month. The front page leads with the three strongest stories that aren't opinion pieces, with the weather beside them. After that comes one section per topic and then "On this day".
 
-**Story cards.** Every card shows a label, the source, the publication time, a short summary and a **Read ↗** link to the original, which opens in a new tab. When several outlets ran the same story, you get one card that says "Also reported by …".
+**Story cards.** Every card shows a label, the source, the publication time and a short summary. When several outlets ran the same story, you get one card that says "Also reported by …".
+
+**Reading a story.** Tap **Read** or the headline to open the full article inside the paper, with its photos. During each build the paper copies every story's text and photos onto the server, so stories stay readable on your LAN even when the internet connection is down. Photos are shrunk to tablet size.
+
+If an article couldn't be saved, the card's button says **Read at source ↗** instead and opens the original website. The usual causes are a paywall, a video or live page, or a site that refuses automated readers (Motorsport.com currently does). Every story page also has a **Read the original** link. Settings → General sets how long articles and photos are kept (60 days by default); older editions then link to the original website.
 
 **Labels (Reporting / Analysis / Opinion) are best guesses.** They come from feed categories, web addresses (such as `/opinion/` or `/commentisfree/`) and headline prefixes (such as "Analysis:"). If one is wrong, tap **Label** on the card and pick the right one. To label every story from a source the same way, set **Treat as** for that source in Settings → Sources.
 
@@ -91,12 +95,12 @@ If the forecast can't be fetched, the last saved forecast is shown, marked "as o
 
 | Tab | What you can do |
 |---|---|
-| General | Daily build time, how old stories may be, weather location (search by place name), sign out |
+| General | Daily build time, how old stories may be, how long full articles and photos are kept, weather location (search by place name), sign out |
 | Topics | Add, rename or reorder sections. Set keywords, importance (1–5) and story count, or hide a section |
 | Sources | Add a feed (it's checked first), then pause, resume, test, remove or re-assign it. Set its priority and "treat as" label. Shows each feed's status and last error |
 | Exclusions | Words and phrases that remove a story completely. Comes pre-loaded with celebrity-gossip terms |
 | Learning | The words and sources you've shown you like or avoid. Forget any of them, or reset everything |
-| Backups & system | Last build statistics, next build time, **Back up now**, download backups |
+| Backups & system | Last build statistics, saved articles and photo storage, next build time, **Back up now**, download backups |
 
 ---
 
@@ -152,6 +156,8 @@ Your data lives in the Docker volume `newspaper-data`, so rebuilding the contain
 ## 5. Backup and restore
 
 **Automatic backups.** Every night at 02:30 the app writes a consistent copy of the database to `/data/backups/paper-YYYYMMDD-HHMMSS.db` and keeps the newest `BACKUP_KEEP`. Settings → Backups & system lists them, has a **Back up now** button and lets you **Download** any of them to keep elsewhere.
+
+Backups include the saved article text but not the photos. Photos are a cache: after a restore, a story page without its photo still works, and **Try fetching it now** gets everything again while the original is online.
 
 **Copy backups off the server** (recommended, for example from a nightly host cron job):
 
@@ -211,6 +217,7 @@ This app is built for a trusted home LAN, over plain HTTP.
   - Outbound links use `rel="noopener noreferrer"`.
   - A strict Content-Security-Policy allows only the app's own scripts and styles.
 - **Cross-site requests.** Form posts from other websites are refused (Origin check plus SameSite cookies).
+- **Saved articles.** Article pages are rebuilt from an allow-list of plain tags (paragraphs, headings, quotes, lists, emphasis), so no scripts, styles or links from the source site survive. Photos are re-encoded as plain JPEGs and served from your server. Article and photo downloads refuse private network addresses, so a malicious feed can't make the server fetch things from your LAN.
 - **Container hardening:**
   - runs as a non-root user (uid 10001)
   - read-only root filesystem; only `/data` and a small `/tmp` are writable
@@ -236,6 +243,8 @@ docker compose logs -f
 **The edition is empty, or "Offline edition" is shown.** The server couldn't reach any feeds, so the paper was built from stories saved earlier. Check the server's internet access and DNS, then open Settings → Sources: each feed shows its last error. Tap **Rebuild now** once the connection is back.
 
 **One source shows "Failing".** Open Settings → Sources and tap **Test now** to see the exact error. `HTTP 404` usually means the feed moved; find the new address, remove the old source and add the new one. `HTTP 403` means the site blocks automated readers. A failing feed never stops the rest of the edition.
+
+**A story says "Read at source" or "The full article couldn't be saved".** The story page shows the reason. HTTP 403 means the site refuses automated readers or needs a subscription. "Couldn't find the article text" usually means a paywall, a video or a live blog. Tap **Try fetching it now** on the story page to retry.
 
 **Weather says "as of …".** Open-Meteo couldn't be reached on the last attempt, so the saved forecast is shown. It retries every 30 minutes. Open-Meteo's free tier has a daily request limit per IP address. The app uses about 50 requests a day, well under the limit, unless many devices share your public IP.
 
@@ -287,6 +296,7 @@ docker compose down -v
   - The top 3 non-opinion stories lead the front page.
   - Each section then gets its story count, with at most 2 opinion pieces, plus one wildcard.
 - **On this day.** Uses Wikipedia's selected anniversaries for the date, topped up from the full events list for centuries the selected list misses. Six items are spread across history.
+- **Full articles.** After the edition is saved, each story's page is downloaded (six at a time, 20 s timeout) and the main text is extracted with trafilatura. Up to 8 photos per article are downloaded, scaled to at most 1600 px and stored under `/data/images`. Articles that are already saved aren't fetched again on a rebuild, and failed ones are retried. One edition typically uses 5–10 MB of photos.
 - **Clean-up.** Stories older than 30 days that never appeared in an edition are deleted, so the database stays small.
 
 ---

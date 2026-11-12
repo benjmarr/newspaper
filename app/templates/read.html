@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_card.html" import story_actions %}
+{% block title %}{{ it.title }} · {{ paper_name }}{% endblock %}
+{% block body_class %}page-read{% endblock %}
+{% block main %}
+{% set back = ('/read/' ~ it.story_id) | urlencode %}
+<nav class="reader-nav">
+  <a class="btn" href="{{ back_url }}">‹ Back to the paper</a>
+  <span class="reader-paper small muted">{{ paper_name }} · {{ ed_date | long_date }}</span>
+</nav>
+<article class="card reader {{ 'is-hidden' if it.interest == -1 }}" id="story-{{ it.story_id }}">
+  <div class="hidden-note">
+    <span>You marked this story Not interested.</span>
+    <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
+      <input type="hidden" name="value" value="not_interested">
+      <button class="btn btn-small" type="submit">Undo</button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="meta">
+      <span class="label label-{{ it.label }}" title="Best guess from feed data">{{ label_names[it.label] }}{% if it.label_corrected %}*{% endif %}</span>
+      {% if it.wildcard %}<span class="label label-wild">Wildcard</span>{% endif %}
+      <span class="source">{{ it.source }}</span>
+      {% set when = it.published_at or it.fetched_at %}
+      {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
+    </div>
+    <h1 class="reader-title">{{ it.title }}</h1>
+    {% if it.byline %}<p class="byline">By {{ it.byline }}</p>{% endif %}
+
+    {% if body %}
+      {% if it.lead_image %}<figure class="lead-photo"><img src="/img/{{ it.lead_image }}" alt=""></figure>{% endif %}
+      <div class="reader-body">{{ body }}</div>
+      <p class="reader-note small muted">This text was copied from {{ it.source }} when the paper was built{% if it.article_fetched_at %} ({{ it.article_fetched_at | fmt_time }}){% endif %} and tidied automatically, so some parts (embedded videos, charts, links) may be missing.</p>
+    {% else %}
+      {% if it.summary %}<p class="reader-summary">{{ it.summary }}</p>{% endif %}
+      <div class="note note-warn">
+        {% if it.article_status == 'failed' %}
+        The full article couldn't be saved: {{ it.article_error }}.
+        {% else %}
+        The full article hasn't been saved for this story.
+        {% endif %}
+      </div>
+      <form method="post" action="/read/{{ it.story_id }}/fetch" class="inline-form">
+        <button class="btn" type="submit">Try fetching it now</button>
+      </form>
+    {% endif %}
+
+    {% if it.also_list %}
+    <p class="also">Also reported by
+      {%- for a in it.also_list %} <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.source }}</a>{{ "," if not loop.last }}{% endfor %}
+    </p>
+    {% endif %}
+    <p><a class="btn" href="{{ it.url }}" target="_blank" rel="noopener noreferrer">Read the original at {{ it.source }} ↗</a></p>
+    {{ story_actions(it, back, False) }}
+  </div>
+</article>
+<p class="reader-foot"><a class="btn" href="{{ back_url }}">‹ Back to the paper</a></p>
+{% endblock %}

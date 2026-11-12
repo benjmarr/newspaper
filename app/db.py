@@ -92,6 +92,18 @@ CREATE TABLE IF NOT EXISTS edition_items (
     also TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_items_edition ON edition_items(edition_id);
+CREATE TABLE IF NOT EXISTS articles (
+    story_id INTEGER PRIMARY KEY REFERENCES stories(id) ON DELETE CASCADE,
+    status TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    byline TEXT,
+    lead_image TEXT,
+    images TEXT NOT NULL DEFAULT '[]',
+    words INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    fetched_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_articles_fetched ON articles(fetched_at);
 CREATE TABLE IF NOT EXISTS shown (
     story_id INTEGER NOT NULL,
     edition_date TEXT NOT NULL,
@@ -142,6 +154,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
                  "latitude": -38.3818, "longitude": 142.4880},
     "exclusions": DEFAULT_EXCLUSIONS,
     "max_age_hours": 36,
+    "article_keep_days": 60,
     "decay_epoch": 0,
 }
 
