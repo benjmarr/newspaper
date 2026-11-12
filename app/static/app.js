@@ -23,6 +23,10 @@
       card.classList.toggle("is-hidden", data.interest === -1);
       var yes = card.querySelector(".fb-yes");
       if (yes) yes.setAttribute("aria-pressed", data.interest === 1 ? "true" : "false");
+      var liked = card.querySelector(".liked");
+      if (liked) liked.hidden = data.interest !== 1;
+      var more = card.querySelector("details.more");
+      if (more) more.open = false;
       buttons.forEach(function (b) { b.disabled = false; });
     }).catch(function () {
       form.submit(); // fall back to the plain form post

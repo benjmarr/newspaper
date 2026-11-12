@@ -131,7 +131,7 @@ code { font-size: 0.9em; }
 .label-opinion { color: var(--opinion); }
 .label-wild { color: var(--accent); }
 .also { font-size: 0.9rem; color: var(--muted); margin: 0 0 8px; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; margin-top: 6px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
 .actions form { margin: 0; }
 .hidden-note { display: none; }
 .card.is-hidden { padding: 8px 12px; }
@@ -147,17 +147,24 @@ code { font-size: 0.9em; }
 .btn[disabled] { opacity: 0.5; cursor: default; }
 .btn-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .btn-danger { color: var(--err-ink); border-color: currentColor; }
-.btn-small { font-size: 14px; }
 .btn[aria-pressed="true"] { background: var(--pressed); border-color: var(--ink); font-weight: 700; }
 .fb-yes[aria-pressed="true"]::before { content: "✓ "; }
-.btn-read { margin-left: auto; }
 details > summary { list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
-.fix-label { position: relative; }
-.fix-label[open] > summary { background: var(--pressed); }
-.fix-label-panel { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; width: 100%; }
-.fix-label-panel p { width: 100%; margin: 0; }
-.fix-label[open] { flex-basis: 100%; }
+/* Occasional options live behind a quiet ⋯ button (still a full 48px tap target). */
+.more { margin-left: auto; }
+.more[open] { flex-basis: 100%; margin-left: 0; }
+.btn-quiet { display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch); min-height: var(--touch);
+  margin-left: auto; color: var(--muted); font-family: var(--sans); font-size: 22px; line-height: 1; letter-spacing: 1px;
+  border-radius: 24px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.more[open] > .btn-quiet { background: var(--pressed); color: var(--ink); width: var(--touch); margin-left: auto; display: flex; }
+.more-panel { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.more-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn-small { font-size: 14px; }
+.more-panel .btn-small { color: var(--muted); }
+.more-panel .btn-small[aria-pressed="true"] { color: var(--ink); }
+.liked { color: var(--accent); font-weight: 600; }
+.liked[hidden] { display: none; }
 .confirm[open] { display: flex; gap: 8px; }
 
 /* Weather */

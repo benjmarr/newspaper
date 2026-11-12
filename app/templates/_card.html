@@ -1,13 +1,5 @@
 {% macro story_actions(it, back, show_read) -%}
 <div class="actions">
-  <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
-    <input type="hidden" name="value" value="interested">
-    <button class="btn btn-fb fb-yes" type="submit" aria-pressed="{{ 'true' if it.interest == 1 else 'false' }}">Interested</button>
-  </form>
-  <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
-    <input type="hidden" name="value" value="not_interested">
-    <button class="btn btn-fb fb-no" type="submit" aria-pressed="false">Not interested</button>
-  </form>
   {% if show_read %}
     {% if it.article_status == 'ok' %}
   <a class="btn btn-read btn-primary" href="/read/{{ it.story_id }}">Read</a>
@@ -15,22 +7,34 @@
   <a class="btn btn-read" href="{{ it.url }}" target="_blank" rel="noopener noreferrer">Read at source ↗</a>
     {% endif %}
   {% endif %}
-  <details class="fix-label">
-    <summary class="btn">Label</summary>
-    <div class="fix-label-panel">
-      <p class="small muted">Labels are best guesses. Correct this one:</p>
-      {% for key in ['reporting', 'analysis', 'opinion'] %}
-      <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
-        <input type="hidden" name="label" value="{{ key }}">
-        <button class="btn btn-small" type="submit" {{ 'aria-pressed=true' if it.label == key }}>{{ label_names[key] }}</button>
-      </form>
-      {% endfor %}
-      {% if it.label_corrected %}
-      <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
-        <input type="hidden" name="label" value="auto">
-        <button class="btn btn-small" type="submit">Use automatic guess</button>
-      </form>
-      {% endif %}
+  <details class="more">
+    <summary class="btn-quiet" aria-label="More options for this story" title="More options">⋯</summary>
+    <div class="more-panel">
+      <div class="more-row">
+        <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
+          <input type="hidden" name="value" value="interested">
+          <button class="btn btn-small btn-fb fb-yes" type="submit" aria-pressed="{{ 'true' if it.interest == 1 else 'false' }}">Interested</button>
+        </form>
+        <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
+          <input type="hidden" name="value" value="not_interested">
+          <button class="btn btn-small btn-fb fb-no" type="submit" aria-pressed="false">Not interested</button>
+        </form>
+      </div>
+      <div class="more-row">
+        <span class="small muted">Label (best guess):</span>
+        {% for key in ['reporting', 'analysis', 'opinion'] %}
+        <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
+          <input type="hidden" name="label" value="{{ key }}">
+          <button class="btn btn-small" type="submit" {{ 'aria-pressed=true' if it.label == key }}>{{ label_names[key] }}</button>
+        </form>
+        {% endfor %}
+        {% if it.label_corrected %}
+        <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
+          <input type="hidden" name="label" value="auto">
+          <button class="btn btn-small" type="submit">Automatic</button>
+        </form>
+        {% endif %}
+      </div>
     </div>
   </details>
 </div>
@@ -53,6 +57,7 @@
       <span class="source">{{ it.source }}</span>
       {% set when = it.published_at or it.fetched_at %}
       {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
+      <span class="liked" {{ 'hidden' if it.interest != 1 }}>★ Interested</span>
     </div>
     {% if it.article_status == 'ok' %}
     <h3 class="headline"><a href="/read/{{ it.story_id }}">{{ it.title }}</a></h3>

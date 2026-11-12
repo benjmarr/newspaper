@@ -1,7 +1,7 @@
 // Network-first service worker: always try the server, fall back to the last copy we saved.
-const CACHE = "paper-v3";
+const CACHE = "paper-v4";
 const LAST = "/__last-edition";
-const SHELL = ["/static/style.css?v=3", "/static/app.js?v=3", "/static/icon-192.png"];
+const SHELL = ["/static/style.css?v=4", "/static/app.js?v=4", "/static/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

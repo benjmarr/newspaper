@@ -23,6 +23,7 @@
       <span class="source">{{ it.source }}</span>
       {% set when = it.published_at or it.fetched_at %}
       {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
+      <span class="liked" {{ 'hidden' if it.interest != 1 }}>★ Interested</span>
     </div>
     <h1 class="reader-title">{{ it.title }}</h1>
     {% if it.byline %}<p class="byline">By {{ it.byline }}</p>{% endif %}

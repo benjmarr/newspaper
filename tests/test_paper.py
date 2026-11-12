@@ -182,7 +182,7 @@ def test_labels_shown_and_correctable(app, web, logged_in):
     r = logged_in.post(f"/story/{sid}/label?next=/%23story-{sid}", data={"label": "analysis"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == f"/#story-{sid}"
     card = re.search(rf'id="story-{sid}".*?</article>', logged_in.get("/").text, re.S).group(0)
-    assert "label-analysis" in card and "Use automatic guess" in card
+    assert "label-analysis" in card and "Automatic<" in card
     logged_in.post(f"/story/{sid}/label", data={"label": "auto"})
     card = re.search(rf'id="story-{sid}".*?</article>', logged_in.get("/").text, re.S).group(0)
     assert "label-opinion" in card
