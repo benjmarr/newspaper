@@ -104,6 +104,10 @@ CREATE TABLE IF NOT EXISTS articles (
     fetched_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_articles_fetched ON articles(fetched_at);
+CREATE TABLE IF NOT EXISTS reads (
+    story_id INTEGER PRIMARY KEY REFERENCES stories(id) ON DELETE CASCADE,
+    read_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS shown (
     story_id INTEGER NOT NULL,
     edition_date TEXT NOT NULL,

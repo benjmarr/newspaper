@@ -8,7 +8,7 @@
   <a class="btn" href="{{ back_url }}">‹ Back to the paper</a>
   <span class="reader-paper small muted">{{ paper_name }} · {{ ed_date | long_date }}</span>
 </nav>
-<article class="card reader {{ 'is-hidden' if it.interest == -1 }}" id="story-{{ it.story_id }}">
+<article class="card reader {{ 'is-hidden' if it.interest == -1 }}" id="story-{{ it.story_id }}" data-story="{{ it.story_id }}"{% if not it.is_read %} data-autoread="12"{% endif %}>
   <div class="hidden-note">
     <span>You marked this story Not interested.</span>
     <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
@@ -24,6 +24,7 @@
       {% set when = it.published_at or it.fetched_at %}
       {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
       <span class="liked" {{ 'hidden' if it.interest != 1 }}>★ Interested</span>
+      <span class="read-mark" {{ 'hidden' if not it.is_read }}>✓ Read</span>
     </div>
     <h1 class="reader-title">{{ it.title }}</h1>
     {% if it.byline %}<p class="byline">By {{ it.byline }}</p>{% endif %}

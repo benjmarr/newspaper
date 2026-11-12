@@ -669,3 +669,33 @@ def test_restore_command(app, monkeypatch, capsys):
     assert restore.main([good]) == 0
     assert app.state.db.query_one("SELECT 1 FROM topics WHERE name='Canary'") is None
     assert "Current database saved as" in capsys.readouterr().out
+
+
+def test_read_marks(app, web, logged_in):
+    standard_feeds(web)
+    build(app)
+    sid = story_id(app, "Reserve Bank")
+    card = lambda: re.search(rf'<article class="card[^"]*" id="story-{sid}".*?</article>', logged_in.get("/").text, re.S).group(0)
+    assert "is-read" not in card() and "Mark as read" in card()
+    page = logged_in.get(f"/read/{sid}").text
+    assert 'data-autoread="12"' in page
+    r = logged_in.post(f"/story/{sid}/read", data={"value": "read"}, headers={"x-requested-with": "fetch"})
+    assert r.json() == {"story_id": sid, "read": True}
+    c = card()
+    assert "is-read" in c and "Mark as unread" in c and re.search(r'class="read-mark"\s*>', c)
+    assert 'data-autoread' not in logged_in.get(f"/read/{sid}").text  # already read: no timer
+    # Marking twice is harmless; plain form post (no JS) redirects back.
+    r = logged_in.post(f"/story/{sid}/read?next=/%23story-{sid}", data={"value": "read"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/#story-{sid}"
+    logged_in.post(f"/story/{sid}/read", data={"value": "unread"})
+    assert "is-read" not in card()
+    assert logged_in.post(f"/story/{sid}/read", data={"value": "bogus"}).status_code == 400
+    assert logged_in.post("/story/999999/read", data={"value": "read"}).status_code == 404
+
+
+def test_external_cards_mark_read_on_tap(app, web, logged_in):
+    standard_feeds(web)
+    build(app)
+    html = logged_in.get("/").text
+    # No saved articles in this test, so every card opens the website and carries the tap-to-mark hook.
+    assert html.count("data-mark-read") == html.count('class="card-link"') > 0

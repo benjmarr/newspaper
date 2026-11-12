@@ -129,8 +129,9 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
-        if path not in ("/sw.js",) and not path.startswith("/static/"):
-            response.headers.setdefault("Cache-Control", "no-cache")
+        if path not in ("/sw.js",) and not path.startswith(("/static/", "/img/")):
+            # Pages change as you read (read marks, feedback), so Back must never show a stale copy.
+            response.headers.setdefault("Cache-Control", "no-store")
         return response
 
     def client_id(request: Request) -> str:
@@ -206,9 +207,10 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         ed_date = date.fromisoformat(ed_row["date"])
         items = [dict(r) for r in db.query(
             "SELECT i.*, s.title, s.url, s.summary, s.published_at, s.fetched_at, s.label_auto, s.label_override, "
-            "s.interest, s.feed_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, a.status AS article_status "
+            "s.interest, s.feed_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, a.status AS article_status, "
+            "(r.story_id IS NOT NULL) AS is_read "
             "FROM edition_items i JOIN stories s ON s.id = i.story_id LEFT JOIN feeds f ON f.id = s.feed_id "
-            "LEFT JOIN articles a ON a.story_id = s.id "
+            "LEFT JOIN articles a ON a.story_id = s.id LEFT JOIN reads r ON r.story_id = s.id "
             "WHERE i.edition_id = ? ORDER BY i.section = 'lead' DESC, i.position", (ed_row["id"],))]
         also_ids = {sid for it in items for sid in json.loads(it["also"])}
         also_rows = {}
@@ -306,6 +308,22 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
             return JSONResponse({"story_id": story_id, "interest": state})
         return back(request, f"/#story-{story_id}")
 
+    @app.post("/story/{story_id}/read")
+    def mark_read(request: Request, story_id: int, value: str = Form("read")):
+        if value not in ("read", "unread"):
+            raise HTTPException(400, "Unknown value")
+        with db.conn() as c:
+            if not c.execute("SELECT 1 FROM stories WHERE id = ?", (story_id,)).fetchone():
+                raise HTTPException(404)
+            if value == "read":
+                c.execute("INSERT OR IGNORE INTO reads(story_id, read_at) VALUES (?, ?)",
+                          (story_id, utcnow().isoformat(timespec="seconds")))
+            else:
+                c.execute("DELETE FROM reads WHERE story_id = ?", (story_id,))
+        if is_fetch(request):
+            return JSONResponse({"story_id": story_id, "read": value == "read"})
+        return back(request, f"/#story-{story_id}")
+
     @app.post("/story/{story_id}/label")
     def correct_label(request: Request, story_id: int, label: str = Form(...)):
         if label not in (*text.LABELS, "auto"):
@@ -323,8 +341,9 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         row = db.query_one(
             "SELECT s.*, s.id AS story_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, "
             "a.status AS article_status, a.body, a.byline, a.lead_image, a.words, a.error AS article_error, "
-            "a.fetched_at AS article_fetched_at FROM stories s LEFT JOIN feeds f ON f.id = s.feed_id "
-            "LEFT JOIN articles a ON a.story_id = s.id WHERE s.id = ?", (story_id,))
+            "a.fetched_at AS article_fetched_at, (r.story_id IS NOT NULL) AS is_read "
+            "FROM stories s LEFT JOIN feeds f ON f.id = s.feed_id "
+            "LEFT JOIN articles a ON a.story_id = s.id LEFT JOIN reads r ON r.story_id = s.id WHERE s.id = ?", (story_id,))
         if row is None:
             raise HTTPException(404, "That story isn't stored any more.")
         it = dict(row)

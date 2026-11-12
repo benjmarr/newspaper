@@ -173,6 +173,11 @@ details > summary::-webkit-details-marker { display: none; }
 .more-panel .btn-small[aria-pressed="true"] { color: var(--ink); }
 .liked { color: var(--accent); font-weight: 600; }
 .liked[hidden] { display: none; }
+/* Stories you've read fade back so unread ones stand out. */
+.card.is-read:not(.reader) { opacity: 0.55; }
+.card.is-read:not(.reader) .headline { font-weight: 600; }
+.read-mark { color: var(--ok); font-weight: 600; }
+.read-mark[hidden] { display: none; }
 .confirm[open] { display: flex; gap: 8px; }
 
 /* Weather */

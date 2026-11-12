@@ -70,6 +70,8 @@ If an article couldn't be saved, the card's button says **Read at source ↗** i
 
 **Labels (Reporting / Analysis / Opinion) are best guesses.** They come from feed categories, web addresses (such as `/opinion/` or `/commentisfree/`) and headline prefixes (such as "Analysis:"). If one is wrong, tap **Label** on the card and pick the right one. To label every story from a source the same way, set **Treat as** for that source in Settings → Sources.
 
+**Read stories.** A story counts as read once its page has been on screen for 12 seconds. Stories that open the publisher's website count as read when you tap them, because the paper can't see how long you stay there. Read stories fade back on the front page and show **✓ Read**. To undo, tap **⋯** → **Mark as unread**. Read marks are stored on the server, so every device sees them.
+
 **Interested / Not interested.** These buttons teach the paper what you like:
 
 - **Interested** boosts the words in that headline and the story's source.

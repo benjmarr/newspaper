@@ -14,6 +14,12 @@
         </form>
       </div>
       <div class="more-row">
+        <form method="post" action="/story/{{ it.story_id }}/read?next={{ back }}" class="js-read">
+          <input type="hidden" name="value" value="{{ 'unread' if it.is_read else 'read' }}">
+          <button class="btn btn-small" type="submit">{{ 'Mark as unread' if it.is_read else 'Mark as read' }}</button>
+        </form>
+      </div>
+      <div class="more-row">
         <span class="small muted">Label (best guess):</span>
         {% for key in ['reporting', 'analysis', 'opinion'] %}
         <form method="post" action="/story/{{ it.story_id }}/label?next={{ back }}">
@@ -35,7 +41,7 @@
 
 {% macro card(it, ed_date, path, size='') -%}
 {% set back = (path ~ '#story-' ~ it.story_id) | urlencode %}
-<article class="card {{ size }} {{ 'is-hidden' if it.interest == -1 }}" id="story-{{ it.story_id }}" data-story="{{ it.story_id }}">
+<article class="card {{ size }} {{ 'is-hidden' if it.interest == -1 }} {{ 'is-read' if it.is_read }}" id="story-{{ it.story_id }}" data-story="{{ it.story_id }}">
   <div class="hidden-note">
     <span>Hidden: “{{ it.title }}”</span>
     <form method="post" action="/story/{{ it.story_id }}/feedback?next={{ back }}" class="js-feedback">
@@ -51,12 +57,13 @@
       {% set when = it.published_at or it.fetched_at %}
       {% if when %}<time datetime="{{ when }}">{{ when | fmt_time(ed_date) }}</time>{% endif %}
       <span class="liked" {{ 'hidden' if it.interest != 1 }}>★ Interested</span>
+      <span class="read-mark" {{ 'hidden' if not it.is_read }}>✓ Read</span>
       {% if it.article_status != 'ok' %}<span class="external">opens website ↗</span>{% endif %}
     </div>
     {% if it.article_status == 'ok' %}
     <h3 class="headline"><a class="card-link" href="/read/{{ it.story_id }}">{{ it.title }}</a></h3>
     {% else %}
-    <h3 class="headline"><a class="card-link" href="{{ it.url }}" target="_blank" rel="noopener noreferrer">{{ it.title }}</a></h3>
+    <h3 class="headline"><a class="card-link" data-mark-read href="{{ it.url }}" target="_blank" rel="noopener noreferrer">{{ it.title }}</a></h3>
     {% endif %}
     {% if it.summary %}<p class="summary">{{ it.summary }}</p>{% endif %}
     {% if it.also_list %}
