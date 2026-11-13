@@ -244,3 +244,91 @@ def test_old_saved_articles_cleaned_when_shown(app, web, logged_in):
         c.execute("UPDATE articles SET body = '<ul><li>Published 1 day ago</li></ul>' || body WHERE story_id = ?", (s,))
     page = logged_in.get(f"/read/{s}").text
     assert "Published 1 day ago" not in page and "Work starts in March." in page
+
+
+# --- recovering from a reboot during the build ------------------------------------
+
+def test_interrupted_article_download_resumes_on_startup(app, web, logged_in, monkeypatch):
+    setup_pages(web)
+    b = app.state.builder
+
+    # Simulate the server stopping right after the edition was saved, before articles were fetched.
+    class Stop(Exception):
+        pass
+
+    def killed(story_ids):
+        raise Stop()
+    monkeypatch.setattr(b, "fetch_articles", killed)
+    with pytest.raises(Stop):
+        b._build(b.today(), "scheduled")
+    b._lock = type(b._lock)()  # the process "died": nothing holds the lock after restart
+    monkeypatch.undo()
+
+    assert b.needs_catch_up() is False          # the edition exists...
+    assert b.needs_article_resume() is True      # ...but its articles were never saved
+    assert app.state.db.query_one("SELECT COUNT(*) n FROM articles")["n"] == 0
+
+    jobs = app.state.jobs
+    jobs.start()                                  # what happens when the container starts again
+    try:
+        for _ in range(200):
+            if not b.needs_article_resume() and not b.building:
+                break
+            import time; time.sleep(0.05)
+    finally:
+        jobs.shutdown()
+    assert b.needs_article_resume() is False
+    s = sid(app, "breakwater")
+    assert "Work starts in March." in logged_in.get(f"/read/{s}").text
+    data = json.loads(app.state.db.query_one("SELECT data FROM editions")["data"])
+    assert data["articles_done"] is True and data["articles"]["ok"] >= 2
+
+
+def test_completed_build_needs_no_resume(app, web):
+    setup_pages(web)
+    build(app)
+    assert app.state.builder.needs_article_resume() is False
+    assert app.state.builder.resume_articles() is None
+
+
+def test_offline_edition_retried_until_window_closes(app, web, logged_in):
+    from datetime import datetime
+    setup_pages(web)
+    b, jobs = app.state.builder, app.state.jobs
+    app.state.db.set_setting("build_time", "05:00")
+    today = b.today()
+    tz = app.state.config.tz
+    at = lambda h, m: datetime(today.year, today.month, today.day, h, m, tzinfo=tz)
+
+    # 5:03, just after the reboot: the network isn't up yet, so the edition is built offline.
+    saved = dict(web.feeds)
+    web.fail = {u: "timeout" for u in saved}
+    assert build(app)["offline"] is True
+    assert b.needs_offline_retry(at(5, 3)) is True
+    assert b.needs_offline_retry(at(8, 59)) is True
+    assert b.needs_offline_retry(at(9, 0)) is False      # gives up 4 hours after build time
+    assert b.needs_offline_retry(at(4, 59)) is False
+
+    # 5:15: still down -> another offline edition, still retrying.
+    b.needs_offline_retry = lambda now=None: type(b).needs_offline_retry(b, at(5, 15))
+    jobs._offline_retry()
+    assert app.state.db.query_one("SELECT offline FROM editions")["offline"] == 1
+
+    # 5:30: the internet is back -> a normal edition replaces the offline one, with full articles.
+    web.fail = {}
+    b.needs_offline_retry = lambda now=None: type(b).needs_offline_retry(b, at(5, 30))
+    jobs._offline_retry()
+    row = app.state.db.query_one("SELECT offline, data FROM editions")
+    assert row["offline"] == 0 and json.loads(row["data"])["articles_done"] is True
+    assert "Offline edition" not in logged_in.get("/").text
+    # ...and there's nothing more to retry.
+    assert type(b).needs_offline_retry(b, at(5, 45)) is False
+
+
+def test_normal_edition_is_never_retried(app, web):
+    from datetime import datetime
+    setup_pages(web)
+    build(app)
+    b = app.state.builder
+    t = b.today()
+    assert b.needs_offline_retry(datetime(t.year, t.month, t.day, 5, 30, tzinfo=app.state.config.tz)) is False

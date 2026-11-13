@@ -8,7 +8,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from . import backup, weather
-from .edition import Builder, parse_build_time
+from .edition import OFFLINE_RETRY_MINUTES, Builder, parse_build_time
 
 log = logging.getLogger("paper.scheduler")
 
@@ -26,10 +26,14 @@ class Jobs:
                                id="backup", replace_existing=True, misfire_grace_time=3600, coalesce=True)
         self.scheduler.add_job(self._weather, IntervalTrigger(minutes=30), id="weather", replace_existing=True,
                                coalesce=True, max_instances=1)
+        self.scheduler.add_job(self._offline_retry, IntervalTrigger(minutes=OFFLINE_RETRY_MINUTES),
+                               id="offline-retry", replace_existing=True, coalesce=True, max_instances=1)
         self.scheduler.start()
         if self.builder.needs_catch_up():
             log.info("Today's edition is missing and build time has passed: building now")
             self.builder.start_background(reason="startup catch-up")
+        elif self.builder.needs_article_resume():
+            self.scheduler.add_job(self.builder.resume_articles, id="resume-articles", replace_existing=True)
         elif not self.db.get_setting("weather_cache", None):
             self.scheduler.add_job(self._weather, id="weather-now", replace_existing=True)
 
@@ -49,6 +53,14 @@ class Jobs:
 
     def _build(self) -> None:
         self.builder.build(reason="scheduled")
+
+    def _offline_retry(self) -> None:
+        """An offline edition (e.g. the internet wasn't back yet after a reboot) is rebuilt every
+        15 minutes until the feeds are reachable or the retry window closes."""
+        if self.builder.building or not self.builder.needs_offline_retry():
+            return
+        log.info("Today's edition was built offline: trying again")
+        self.builder.build(reason="retry after offline edition")
 
     def _backup(self) -> None:
         backup.run_recorded(self.db, self.config)

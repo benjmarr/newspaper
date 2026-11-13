@@ -131,6 +131,8 @@ docker compose up -d
 - The weather refreshes every 30 minutes.
 - The database is backed up nightly at **02:30**.
 - If the server was off at build time, the edition is built as soon as the app starts again.
+- If the server stopped partway through a build (a reboot, say) after the edition was saved, the app finishes saving the full articles and photos when it starts again.
+- If an edition had to be built offline (for example, the internet wasn't back yet after a reboot), the app rebuilds it every 15 minutes until the feeds can be reached, for up to 4 hours after the build time.
 
 **Seeded sources.** These are added on first start:
 

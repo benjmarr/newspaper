@@ -17,6 +17,8 @@ log = logging.getLogger("paper.edition")
 
 OFFLINE_WINDOW_DAYS = 7
 HISTORY_DAYS = 10
+OFFLINE_RETRY_WINDOW = timedelta(hours=4)   # keep retrying an offline edition until build time + 4 h
+OFFLINE_RETRY_MINUTES = 15
 
 
 class Builder:
@@ -118,6 +120,9 @@ class Builder:
             "topics": {str(t["id"]): t["name"] for t in topics},
             "snapshot": weather.snapshot(db),
             "build_seconds": round((utcnow() - now).total_seconds(), 1),
+            # False until phase 2 finishes. If the server stops in between (a reboot, say),
+            # the next start notices and finishes saving the articles.
+            "articles_done": offline,
         }
         with db.conn() as c:
             c.execute("DELETE FROM editions WHERE date = ?", (day.isoformat(),))
@@ -142,6 +147,7 @@ class Builder:
         if not offline:
             self.phase = "Saving full articles and photos…"
             data["articles"] = self.fetch_articles([i["story_id"] for i in selection.items])
+            data["articles_done"] = True
             with db.conn() as c:
                 c.execute("UPDATE editions SET data = ? WHERE id = ?", (json.dumps(data), edition_id))
         try:
@@ -164,6 +170,57 @@ class Builder:
         except Exception as exc:
             log.exception("Article fetching failed")
             return {"ok": 0, "failed": len(story_ids), "images": 0, "error": type(exc).__name__}
+
+    # --- recovering from interruptions -------------------------------------------------
+    def _today_edition(self):
+        return self.db.query_one("SELECT * FROM editions WHERE date = ?", (self.today().isoformat(),))
+
+    def needs_article_resume(self) -> bool:
+        """True if today's edition was saved but the server stopped before its articles were."""
+        row = self._today_edition()
+        return bool(row) and json.loads(row["data"]).get("articles_done") is False
+
+    def resume_articles(self) -> dict[str, int] | None:
+        """Finish saving full articles for today's edition. Runs under the build lock."""
+        if not self._lock.acquire(blocking=False):
+            return None
+        self.started_at = utcnow()
+        try:
+            row = self._today_edition()
+            if not row:
+                return None
+            data = json.loads(row["data"])
+            if data.get("articles_done") is not False:
+                return None
+            log.info("Finishing the article download that was interrupted for %s", row["date"])
+            self.phase = "Finishing saving full articles and photos…"
+            ids = [r["story_id"] for r in self.db.query(
+                "SELECT story_id FROM edition_items WHERE edition_id = ?", (row["id"],))]
+            stats = self.fetch_articles(ids)
+            data["articles"], data["articles_done"] = stats, True
+            with self.db.conn() as c:
+                c.execute("UPDATE editions SET data = ? WHERE id = ?", (json.dumps(data), row["id"]))
+            return stats
+        finally:
+            self.started_at = None
+            self.phase = None
+            self._lock.release()
+
+    def build_window(self, now: datetime | None = None) -> tuple[datetime, datetime]:
+        """Today's build time and the end of the window in which an offline edition is retried."""
+        now = now or datetime.now(self.config.tz)
+        hh, mm = parse_build_time(self.db.get_setting("build_time", "05:00"))
+        start = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        return start, start + OFFLINE_RETRY_WINDOW
+
+    def needs_offline_retry(self, now: datetime | None = None) -> bool:
+        """True if today's edition had to be built offline and we're still within the retry window."""
+        now = now or datetime.now(self.config.tz)
+        start, end = self.build_window(now)
+        if not (start <= now < end):
+            return False
+        row = self._today_edition()
+        return bool(row) and bool(row["offline"])
 
     def needs_catch_up(self) -> bool:
         """True if today's edition is missing and today's build time has already passed."""
