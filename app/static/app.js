@@ -103,8 +103,10 @@
       button.setAttribute("aria-pressed", adding ? "true" : "false");
       input.value = adding ? "remove" : "add";
       post(form.action, { value: adding ? "add" : "remove" }).then(function (data) {
-        var badge = document.querySelector("[data-to-read-count]");
-        if (badge) { badge.textContent = data.count; badge.hidden = !data.count; }
+        document.querySelectorAll("[data-to-read-count]").forEach(function (badge) {
+          badge.textContent = data.count;
+          badge.hidden = !data.count;
+        });
       }).catch(function () {
         button.setAttribute("aria-pressed", adding ? "false" : "true");
         input.value = adding ? "add" : "remove";

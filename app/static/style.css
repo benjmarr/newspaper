@@ -295,3 +295,6 @@ label { font-family: var(--sans); font-size: 15px; }
 .reader-next { max-width: 760px; margin: -8px auto 24px; text-align: right; }
 .navlink { white-space: nowrap; }
 @media (max-width: 420px) { .navlink { padding: 0 8px; } .topbar { gap: 0; } }
+.to-read-cta { display: flex; justify-content: center; margin: 32px 0 8px; }
+.to-read-cta .btn { font-size: 17px; padding: 0 24px; }
+.to-read-cta .nav-count { margin-right: 6px; }

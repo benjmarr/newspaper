@@ -56,9 +56,13 @@
   {% endif %}
 </section>
 
+<div class="to-read-cta">
+  <a class="btn btn-primary" href="/reading-list">To read<span class="nav-count" data-to-read-count {{ 'hidden' if not to_read_count }}>{{ to_read_count }}</span> ›</a>
+</div>
+
 <footer class="edition-footer" id="rebuild">
   <p class="small muted">Built {{ built_at.strftime('%A %-d %B at %-I:%M %p') if built_at }}{% if data.reason %} ({{ data.reason }}){% endif %}.
-    Story labels (Reporting / Analysis / Opinion) are best guesses from feed data and web addresses; tap “Label” on a story to correct one.</p>
+    Story labels (Reporting / Analysis / Opinion) are best guesses from feed data and web addresses; tap ⋯ on a story to correct one.</p>
   {% if is_latest %}
   <form method="post" action="/rebuild" class="js-rebuild">
     <button class="btn" type="submit" {{ 'disabled' if building }}>{{ 'Building…' if building else 'Rebuild now' }}</button>

@@ -380,14 +380,33 @@ def test_reading_list_flow(app, web, logged_in):
     assert "Next on your list" not in logged_in.get(f"/read/{b}?from=list").text  # last one left
 
 
-def test_reading_list_carries_over_to_the_next_day(app, web, logged_in):
+def test_reading_list_clears_with_each_new_days_edition(app, web, logged_in):
     setup_pages(web)
     today = app.state.builder.today()
     app.state.builder.build(reason="test", edition_date=today - timedelta(days=1))
-    s = sid(app, "breakwater")
-    logged_in.post(f"/story/{s}/later", data={"value": "add"})
-    app.state.builder.build(reason="test", edition_date=today)
-    assert f'id="story-{s}"' in logged_in.get("/reading-list").text
+    a, b = sid(app, "breakwater"), sid(app, "Linux kernel")
+    logged_in.post(f"/story/{a}/later", data={"value": "add"})
+    logged_in.post(f"/story/{b}/later", data={"value": "add"})
+    logged_in.post(f"/story/{b}/read", data={"value": "read"})   # one finished, one not
+    # Rebuilding the same day keeps the list.
+    app.state.builder.build(reason="rebuild now", edition_date=today - timedelta(days=1))
+    assert f'id="story-{a}"' in logged_in.get("/reading-list").text
+    # The next morning's edition starts a fresh list (unread and finished alike).
+    result = app.state.builder.build(reason="scheduled", edition_date=today)
+    assert result["reading_list_cleared"] == 2
+    page = logged_in.get("/reading-list").text
+    assert "Nothing saved yet" in page and re.search(r'data-to-read-count hidden\s*>0<', page)
+
+
+def test_to_read_button_at_bottom_of_paper(app, web, logged_in):
+    setup_pages(web)
+    build(app)
+    html = logged_in.get("/").text
+    footer = html[html.index('class="to-read-cta"'):]
+    assert 'href="/reading-list"' in footer and footer.index("to-read-cta") < footer.index("edition-footer")
+    logged_in.post(f"/story/{sid(app, 'breakwater')}/later", data={"value": "add"})
+    html = logged_in.get("/").text
+    assert len(re.findall(r'data-to-read-count\s*>1<', html)) == 2   # top bar and bottom button
 
 
 def test_reading_list_bad_requests(logged_in):

@@ -8,13 +8,13 @@
   {% if not to_read and not finished %}
   <div class="empty-list">
     <p>Nothing saved yet.</p>
-    <p class="muted">While you scroll through the paper, tap <strong>＋ To read</strong> on any story you want to come back to. It will wait for you here.</p>
+    <p class="muted">While you scroll through the paper, tap <strong>＋ To read</strong> on any story you want to come back to. It will wait for you here until the next morning's paper is built.</p>
     <p><a class="btn" href="/">Go to today's paper</a></p>
   </div>
   {% endif %}
 
   {% if to_read %}
-  <p class="muted small">{{ to_read | length }} stor{{ 'y' if to_read|length == 1 else 'ies' }} waiting, in the order you saved them. A story moves to Finished once you've read it.</p>
+  <p class="muted small">{{ to_read | length }} stor{{ 'y' if to_read|length == 1 else 'ies' }} waiting, in the order you saved them. A story moves to Finished once you've read it. The list starts fresh with each morning's paper.</p>
   <div class="list-cards">
     {% for it in to_read %}{{ card(it, ed_date, path, '', True) }}{% endfor %}
   </div>

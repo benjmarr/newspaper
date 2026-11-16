@@ -124,7 +124,11 @@ class Builder:
             # the next start notices and finishes saving the articles.
             "articles_done": offline,
         }
+        # A new day's edition starts a fresh To read list; rebuilding the same day keeps it.
+        new_day = db.query_one("SELECT 1 FROM editions WHERE date = ?", (day.isoformat(),)) is None
         with db.conn() as c:
+            if new_day:
+                data["reading_list_cleared"] = c.execute("DELETE FROM reading_list").rowcount
             c.execute("DELETE FROM editions WHERE date = ?", (day.isoformat(),))
             c.execute("DELETE FROM shown WHERE edition_date = ?", (day.isoformat(),))
             cur = c.execute("INSERT INTO editions(date, built_at, offline, data) VALUES (?,?,?,?)",
