@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_card.html" import card %}
+{% block title %}To read · {{ paper_name }}{% endblock %}
+{% block body_class %}page-list{% endblock %}
+{% block main %}
+<div class="page reading-list">
+  <h1>To read</h1>
+  {% if not to_read and not finished %}
+  <div class="empty-list">
+    <p>Nothing saved yet.</p>
+    <p class="muted">While you scroll through the paper, tap <strong>＋ To read</strong> on any story you want to come back to. It will wait for you here.</p>
+    <p><a class="btn" href="/">Go to today's paper</a></p>
+  </div>
+  {% endif %}
+
+  {% if to_read %}
+  <p class="muted small">{{ to_read | length }} stor{{ 'y' if to_read|length == 1 else 'ies' }} waiting, in the order you saved them. A story moves to Finished once you've read it.</p>
+  <div class="list-cards">
+    {% for it in to_read %}{{ card(it, ed_date, path, '', True) }}{% endfor %}
+  </div>
+  {% elif finished %}
+  <p class="muted">All caught up.</p>
+  {% endif %}
+
+  {% if finished %}
+  <section class="finished">
+    <div class="finished-head">
+      <h2>Finished</h2>
+      <form method="post" action="/reading-list/clear-finished"><button class="btn btn-small" type="submit">Clear finished</button></form>
+    </div>
+    <div class="list-cards">
+      {% for it in finished %}{{ card(it, ed_date, path, '', True) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

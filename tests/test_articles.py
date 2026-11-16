@@ -332,3 +332,64 @@ def test_normal_edition_is_never_retried(app, web):
     b = app.state.builder
     t = b.today()
     assert b.needs_offline_retry(datetime(t.year, t.month, t.day, 5, 30, tzinfo=app.state.config.tz)) is False
+
+
+# --- reading list -----------------------------------------------------------------
+
+def test_reading_list_flow(app, web, logged_in):
+    setup_pages(web)
+    build(app)
+    a, b, c = sid(app, "breakwater"), sid(app, "Linux kernel"), sid(app, "Reserve Bank")
+    assert "Nothing saved yet" in logged_in.get("/reading-list").text
+
+    # Save three stories from the front page (the JS path returns the new count for the badge).
+    for n, s in enumerate((a, b, c), start=1):
+        r = logged_in.post(f"/story/{s}/later", data={"value": "add"}, headers={"x-requested-with": "fetch"})
+        assert r.json() == {"story_id": s, "saved": True, "count": n}
+    home = logged_in.get("/").text
+    assert re.search(r'data-to-read-count\s*>3<', home)
+    card = re.search(rf'id="story-{a}".*?</article>', home, re.S).group(0)
+    assert 'class="btn-later" type="submit" aria-pressed="true"' in card and 'value="remove"' in card
+
+    # The list shows them in the order saved, linking into the reader with ?from=list.
+    page = logged_in.get("/reading-list").text
+    assert page.index(f'id="story-{a}"') < page.index(f'id="story-{b}"') < page.index(f'id="story-{c}"')
+    assert f'href="/read/{a}?from=list"' in page and "3 stories waiting" in page
+
+    # Reading from the list: back goes to the list, and "Next" goes to the next unread one.
+    r = logged_in.get(f"/read/{a}?from=list").text
+    assert f'href="/reading-list#story-{a}"' in r and "Back to your list" in r
+    assert f'href="/read/{b}?from=list"' in r and "Next on your list" in r
+    # Opened from the paper instead: no list navigation.
+    assert "Next on your list" not in logged_in.get(f"/read/{a}").text
+
+    # Finishing a story moves it to Finished and drops the count.
+    logged_in.post(f"/story/{a}/read", data={"value": "read"})
+    page = logged_in.get("/reading-list").text
+    assert page.index("Finished") < page.index(f'id="story-{a}"')
+    assert "2 stories waiting" in page and re.search(r'data-to-read-count\s*>2<', page)
+    assert f'href="/read/{c}?from=list"' in logged_in.get(f"/read/{b}?from=list").text
+
+    # Removing (no-JS form post) and clearing finished.
+    r = logged_in.post(f"/story/{c}/later?next=/reading-list", data={"value": "remove"}, follow_redirects=False)
+    assert r.headers["location"] == "/reading-list"
+    r = logged_in.post("/reading-list/clear-finished", follow_redirects=False)
+    assert "Cleared%201%20finished%20story" in r.headers["location"]
+    page = logged_in.get("/reading-list").text
+    assert f'id="story-{b}"' in page and f'id="story-{a}"' not in page and f'id="story-{c}"' not in page
+    assert "Next on your list" not in logged_in.get(f"/read/{b}?from=list").text  # last one left
+
+
+def test_reading_list_carries_over_to_the_next_day(app, web, logged_in):
+    setup_pages(web)
+    today = app.state.builder.today()
+    app.state.builder.build(reason="test", edition_date=today - timedelta(days=1))
+    s = sid(app, "breakwater")
+    logged_in.post(f"/story/{s}/later", data={"value": "add"})
+    app.state.builder.build(reason="test", edition_date=today)
+    assert f'id="story-{s}"' in logged_in.get("/reading-list").text
+
+
+def test_reading_list_bad_requests(logged_in):
+    assert logged_in.post("/story/999999/later", data={"value": "add"}).status_code == 404
+    assert logged_in.post("/story/1/later", data={"value": "maybe"}).status_code == 400

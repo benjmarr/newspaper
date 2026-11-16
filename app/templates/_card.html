@@ -1,5 +1,11 @@
 {% macro story_actions(it, back) -%}
 <div class="actions">
+  <form method="post" action="/story/{{ it.story_id }}/later?next={{ back }}" class="js-later">
+    <input type="hidden" name="value" value="{{ 'remove' if it.saved else 'add' }}">
+    <button class="btn-later" type="submit" aria-pressed="{{ 'true' if it.saved else 'false' }}">
+      <span class="later-off">＋ To read</span><span class="later-on">✓ To read</span>
+    </button>
+  </form>
   <details class="more">
     <summary class="btn-quiet" aria-label="More options for this story" title="More options">⋯</summary>
     <div class="more-panel">
@@ -39,7 +45,7 @@
 </div>
 {%- endmacro %}
 
-{% macro card(it, ed_date, path, size='') -%}
+{% macro card(it, ed_date, path, size='', from_list=False) -%}
 {% set back = (path ~ '#story-' ~ it.story_id) | urlencode %}
 <article class="card {{ size }} {{ 'is-hidden' if it.interest == -1 }} {{ 'is-read' if it.is_read }}" id="story-{{ it.story_id }}" data-story="{{ it.story_id }}">
   <div class="hidden-note">
@@ -61,7 +67,7 @@
       {% if it.article_status != 'ok' %}<span class="external">opens website ↗</span>{% endif %}
     </div>
     {% if it.article_status == 'ok' %}
-    <h3 class="headline"><a class="card-link" href="/read/{{ it.story_id }}">{{ it.title }}</a></h3>
+    <h3 class="headline"><a class="card-link" href="/read/{{ it.story_id }}{{ '?from=list' if from_list }}">{{ it.title }}</a></h3>
     {% else %}
     <h3 class="headline"><a class="card-link" data-mark-read href="{{ it.url }}" target="_blank" rel="noopener noreferrer">{{ it.title }}</a></h3>
     {% endif %}

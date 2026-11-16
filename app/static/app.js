@@ -89,10 +89,28 @@
     if (!form.classList || !window.fetch) return;
     var isFeedback = form.classList.contains("js-feedback");
     var isRead = form.classList.contains("js-read");
-    if (!isFeedback && !isRead) return;
+    var isLater = form.classList.contains("js-later");
+    if (!isFeedback && !isRead && !isLater) return;
     ev.preventDefault();
     var card = form.closest(".card");
     var more = card ? card.querySelector("details.more") : null;
+
+    if (isLater) {
+      var input = form.querySelector("input[name=value]");
+      var button = form.querySelector("button");
+      var adding = input.value === "add";
+      // Update straight away so tapping while scrolling feels instant; the server catches up.
+      button.setAttribute("aria-pressed", adding ? "true" : "false");
+      input.value = adding ? "remove" : "add";
+      post(form.action, { value: adding ? "add" : "remove" }).then(function (data) {
+        var badge = document.querySelector("[data-to-read-count]");
+        if (badge) { badge.textContent = data.count; badge.hidden = !data.count; }
+      }).catch(function () {
+        button.setAttribute("aria-pressed", adding ? "false" : "true");
+        input.value = adding ? "add" : "remove";
+      });
+      return;
+    }
 
     if (isRead) {
       var value = form.querySelector("input[name=value]").value;

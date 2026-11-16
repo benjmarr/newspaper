@@ -5,7 +5,7 @@
 {% block main %}
 {% set back = ('/read/' ~ it.story_id) | urlencode %}
 <nav class="reader-nav">
-  <a class="btn" href="{{ back_url }}">‹ Back to the paper</a>
+  <a class="btn" href="{{ back_url }}">‹ Back to {{ 'your list' if from_list else 'the paper' }}</a>
   <span class="reader-paper small muted">{{ paper_name }} · {{ ed_date | long_date }}</span>
 </nav>
 <article class="card reader {{ 'is-hidden' if it.interest == -1 }}" id="story-{{ it.story_id }}" data-story="{{ it.story_id }}"{% if not it.is_read %} data-autoread="12"{% endif %}>
@@ -56,5 +56,9 @@
     {{ story_actions(it, back) }}
   </div>
 </article>
-<p class="reader-foot"><a class="btn" href="{{ back_url }}">‹ Back to the paper</a></p>
+<p class="reader-foot">
+  <a class="btn" href="{{ back_url }}">‹ Back to {{ 'your list' if from_list else 'the paper' }}</a>
+  {% if next_up %}<a class="btn btn-primary next-up" href="/read/{{ next_up.story_id }}?from=list">Next on your list ›</a>{% endif %}
+</p>
+{% if next_up %}<p class="reader-next small muted">Up next: {{ next_up.title }}</p>{% endif %}
 {% endblock %}

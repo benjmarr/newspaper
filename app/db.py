@@ -108,6 +108,10 @@ CREATE TABLE IF NOT EXISTS reads (
     story_id INTEGER PRIMARY KEY REFERENCES stories(id) ON DELETE CASCADE,
     read_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS reading_list (
+    story_id INTEGER PRIMARY KEY REFERENCES stories(id) ON DELETE CASCADE,
+    added_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS shown (
     story_id INTEGER NOT NULL,
     edition_date TEXT NOT NULL,

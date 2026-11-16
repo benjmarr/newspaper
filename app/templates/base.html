@@ -14,9 +14,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="{{ paper_name }}">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/style.css?v=7">
 {% block head %}{% endblock %}
-<script src="/static/app.js?v=6" defer></script>
+<script src="/static/app.js?v=7" defer></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip" href="#main">Skip to content</a>
@@ -25,6 +25,7 @@
   <a class="brand" href="/">{{ paper_name }}</a>
   <span class="spacer"></span>
   <a class="navlink {{ 'active' if path == '/' or path.startswith('/edition') }}" href="/">Today</a>
+  <a class="navlink {{ 'active' if path == '/reading-list' }}" href="/reading-list">To read<span class="nav-count" data-to-read-count {{ 'hidden' if not to_read_count }}>{{ to_read_count }}</span></a>
   <a class="navlink {{ 'active' if path == '/archive' }}" href="/archive">Archive</a>
   <a class="navlink {{ 'active' if path.startswith('/settings') }}" href="/settings">Settings</a>
 </nav>

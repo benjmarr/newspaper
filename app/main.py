@@ -88,8 +88,14 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         ctx.setdefault("err", request.query_params.get("err", "")[:300])
         ctx["building"] = builder.building
         ctx["build_phase"] = builder.phase
+        ctx["to_read_count"] = to_read_count()
         ctx["path"] = request.url.path
         return templates.TemplateResponse(request, name, ctx, status_code=status)
+
+    def to_read_count() -> int:
+        row = db.query_one("SELECT COUNT(*) AS n FROM reading_list rl LEFT JOIN reads r ON r.story_id = rl.story_id "
+                           "WHERE r.story_id IS NULL")
+        return row["n"] if row else 0
 
     def back(request: Request, default: str = "/", **params: str) -> RedirectResponse:
         target = default
@@ -208,9 +214,10 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         items = [dict(r) for r in db.query(
             "SELECT i.*, s.title, s.url, s.summary, s.published_at, s.fetched_at, s.label_auto, s.label_override, "
             "s.interest, s.feed_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, a.status AS article_status, "
-            "(r.story_id IS NOT NULL) AS is_read "
+            "(r.story_id IS NOT NULL) AS is_read, (rl.story_id IS NOT NULL) AS saved "
             "FROM edition_items i JOIN stories s ON s.id = i.story_id LEFT JOIN feeds f ON f.id = s.feed_id "
             "LEFT JOIN articles a ON a.story_id = s.id LEFT JOIN reads r ON r.story_id = s.id "
+            "LEFT JOIN reading_list rl ON rl.story_id = s.id "
             "WHERE i.edition_id = ? ORDER BY i.section = 'lead' DESC, i.position", (ed_row["id"],))]
         also_ids = {sid for it in items for sid in json.loads(it["also"])}
         also_rows = {}
@@ -336,15 +343,62 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                 raise HTTPException(404)
         return back(request, f"/#story-{story_id}")
 
+    # --- reading list ------------------------------------------------------
+    def reading_list_items() -> list[dict[str, Any]]:
+        """Saved stories: unread first (oldest saved first, so you read in the order you picked), then finished."""
+        rows = [dict(r) for r in db.query(
+            "SELECT s.id AS story_id, s.title, s.url, s.summary, s.published_at, s.fetched_at, s.label_auto, "
+            "s.label_override, s.interest, s.feed_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, "
+            "a.status AS article_status, (r.story_id IS NOT NULL) AS is_read, 1 AS saved, rl.added_at, "
+            "0 AS wildcard FROM reading_list rl JOIN stories s ON s.id = rl.story_id "
+            "LEFT JOIN feeds f ON f.id = s.feed_id LEFT JOIN articles a ON a.story_id = s.id "
+            "LEFT JOIN reads r ON r.story_id = s.id ORDER BY (r.story_id IS NOT NULL), rl.added_at, s.id")]
+        for it in rows:
+            it["summary"] = text.remove_promos(it.get("summary") or "")
+            it["label"] = effective_label(it)
+            it["label_corrected"] = it.get("label_override") in text.LABELS
+            it["also_list"] = []
+        return rows
+
+    @app.get("/reading-list", response_class=HTMLResponse)
+    def reading_list(request: Request):
+        items = reading_list_items()
+        return render(request, "reading_list.html", to_read=[i for i in items if not i["is_read"]],
+                      finished=[i for i in items if i["is_read"]], ed_date=builder.today())
+
+    @app.post("/story/{story_id}/later")
+    def toggle_later(request: Request, story_id: int, value: str = Form("add")):
+        if value not in ("add", "remove"):
+            raise HTTPException(400, "Unknown value")
+        with db.conn() as c:
+            if not c.execute("SELECT 1 FROM stories WHERE id = ?", (story_id,)).fetchone():
+                raise HTTPException(404)
+            if value == "add":
+                c.execute("INSERT OR IGNORE INTO reading_list(story_id, added_at) VALUES (?, ?)",
+                          (story_id, utcnow().isoformat(timespec="microseconds")))
+            else:
+                c.execute("DELETE FROM reading_list WHERE story_id = ?", (story_id,))
+        if is_fetch(request):
+            return JSONResponse({"story_id": story_id, "saved": value == "add", "count": to_read_count()})
+        return back(request, f"/#story-{story_id}")
+
+    @app.post("/reading-list/clear-finished")
+    def clear_finished():
+        with db.conn() as c:
+            n = c.execute("DELETE FROM reading_list WHERE story_id IN (SELECT story_id FROM reads)").rowcount
+        return RedirectResponse("/reading-list?msg=" + quote(f"Cleared {n} finished stor{'y' if n == 1 else 'ies'}."),
+                                status_code=303)
+
     # --- reader view -----------------------------------------------------
     @app.get("/read/{story_id}", response_class=HTMLResponse)
     def read_story(request: Request, story_id: int):
         row = db.query_one(
             "SELECT s.*, s.id AS story_id, COALESCE(f.name, s.source_name) AS source, f.treat_as, "
             "a.status AS article_status, a.body, a.byline, a.lead_image, a.words, a.error AS article_error, "
-            "a.fetched_at AS article_fetched_at, (r.story_id IS NOT NULL) AS is_read "
-            "FROM stories s LEFT JOIN feeds f ON f.id = s.feed_id "
-            "LEFT JOIN articles a ON a.story_id = s.id LEFT JOIN reads r ON r.story_id = s.id WHERE s.id = ?", (story_id,))
+            "a.fetched_at AS article_fetched_at, (r.story_id IS NOT NULL) AS is_read, "
+            "(rl.story_id IS NOT NULL) AS saved FROM stories s LEFT JOIN feeds f ON f.id = s.feed_id "
+            "LEFT JOIN articles a ON a.story_id = s.id LEFT JOIN reads r ON r.story_id = s.id "
+            "LEFT JOIN reading_list rl ON rl.story_id = s.id WHERE s.id = ?", (story_id,))
         if row is None:
             raise HTTPException(404, "That story isn't stored any more.")
         it = dict(row)
@@ -370,8 +424,13 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                 it["also_list"] = [dict(r) for r in db.query(
                     f"SELECT s.id, s.url, COALESCE(f.name, s.source_name) AS source FROM stories s "
                     f"LEFT JOIN feeds f ON f.id = s.feed_id WHERE s.id IN ({marks})", tuple(ids))]
-        return render(request, "read.html", it=it, ed_date=ed_date, back_url=back_url,
-                      body=Markup(it["body"]) if it.get("article_status") == "ok" else None)
+        from_list = request.query_params.get("from") == "list"
+        next_up = None
+        if from_list:
+            back_url = f"/reading-list#story-{story_id}"
+            next_up = next((s for s in reading_list_items() if not s["is_read"] and s["story_id"] != story_id), None)
+        return render(request, "read.html", it=it, ed_date=ed_date, back_url=back_url, from_list=from_list,
+                      next_up=next_up, body=Markup(it["body"]) if it.get("article_status") == "ok" else None)
 
     @app.post("/read/{story_id}/fetch")
     async def fetch_story_now(story_id: int):

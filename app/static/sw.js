@@ -1,7 +1,7 @@
 // Network-first service worker: always try the server, fall back to the last copy we saved.
-const CACHE = "paper-v6";
+const CACHE = "paper-v7";
 const LAST = "/__last-edition";
-const SHELL = ["/static/style.css?v=6", "/static/app.js?v=6", "/static/icon-192.png"];
+const SHELL = ["/static/style.css?v=7", "/static/app.js?v=7", "/static/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -16,7 +16,7 @@ self.addEventListener("activate", (event) => {
 });
 
 function isEditionPage(url) {
-  return url.pathname === "/" || url.pathname.startsWith("/edition/") || url.pathname === "/archive" || url.pathname.startsWith("/read/") || url.pathname.startsWith("/img/");
+  return url.pathname === "/" || url.pathname.startsWith("/edition/") || url.pathname === "/archive" || url.pathname === "/reading-list" || url.pathname.startsWith("/read/") || url.pathname.startsWith("/img/");
 }
 
 self.addEventListener("fetch", (event) => {
