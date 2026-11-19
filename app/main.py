@@ -239,7 +239,8 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                 continue
             sec = sections.setdefault(it["section"], {
                 "name": (topic_rows.get(it["section"]) or {}).get("name") or names.get(it["section"]) or "Other",
-                "position": (topic_rows.get(it["section"]) or {}).get("position", 99), "items": []})
+                "position": (topic_rows.get(it["section"]) or {}).get("position", 99),
+                "feel_good": bool((topic_rows.get(it["section"]) or {}).get("feel_good")), "items": []})
             sec["items"].append(it)
         is_latest = ed_row["date"] == latest_date()
         snap = weather.snapshot(db) if is_latest else data.get("snapshot", {})
@@ -250,7 +251,8 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         return {
             "edition": dict(ed_row), "data": data, "ed_date": ed_date,
             "leads": [it for it in items if it["section"] == "lead"],
-            "sections": sorted(sections.values(), key=lambda s: s["position"]),
+            "sections": [s for s in sorted(sections.values(), key=lambda s: s["position"]) if not s["feel_good"]],
+            "feel_good": [s for s in sorted(sections.values(), key=lambda s: s["position"]) if s["feel_good"]],
             "weather": weather.view(snap, config.tz, today=ed_date),
             "onthisday": data.get("onthisday") or {},
             "prev_date": prev_row["date"] if prev_row else None,
@@ -528,14 +530,15 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
 
     @app.post("/settings/topics/{topic_id}")
     def update_topic(topic_id: int, name: str = Form(...), keywords: str = Form(""), importance: int = Form(3),
-                     story_count: int = Form(6), position: int = Form(0), enabled: str = Form("")):
+                     story_count: int = Form(6), position: int = Form(0), enabled: str = Form(""),
+                     feel_good: str = Form("")):
         try:
             fields = topic_fields(name, keywords, importance, story_count, position)
         except ValueError as exc:
             return redirect_settings("topics", err=str(exc))
         with db.conn() as c:
-            c.execute("UPDATE topics SET name=?, keywords=?, importance=?, story_count=?, position=?, enabled=? "
-                      "WHERE id=?", (*fields, 1 if enabled else 0, topic_id))
+            c.execute("UPDATE topics SET name=?, keywords=?, importance=?, story_count=?, position=?, enabled=?, "
+                      "feel_good=? WHERE id=?", (*fields, 1 if enabled else 0, 1 if feel_good else 0, topic_id))
         return redirect_settings("topics", msg=f"Saved “{fields[0]}”. Changes apply from the next build.")
 
     @app.post("/settings/topics/{topic_id}/delete")

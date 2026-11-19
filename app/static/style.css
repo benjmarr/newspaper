@@ -298,3 +298,12 @@ label { font-family: var(--sans); font-size: 15px; }
 .to-read-cta { display: flex; justify-content: center; margin: 32px 0 8px; }
 .to-read-cta .btn { font-size: 17px; padding: 0 24px; }
 .to-read-cta .nav-count { margin-right: 6px; }
+
+/* Feel good: a softer sign-off at the end of the paper */
+.feelgood { margin-top: 32px; padding: 4px 16px 4px; border-radius: 12px; background: var(--feelgood-bg); }
+.feelgood .section-title { border-top: 0; padding-top: 12px; margin-bottom: 0; color: var(--feelgood-ink); }
+.feelgood-intro { margin: 2px 0 14px; }
+.feelgood .card { border-color: var(--feelgood-rule); }
+.feelgood .columns { column-rule-color: var(--feelgood-rule); }
+:root { --feelgood-bg: #f6edc9; --feelgood-ink: #6b4a00; --feelgood-rule: #e3d29a; }
+@media (prefers-color-scheme: dark) { :root { --feelgood-bg: #2a2512; --feelgood-ink: #f0d58a; --feelgood-rule: #4a4120; } }

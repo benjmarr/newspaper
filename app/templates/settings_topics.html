@@ -11,6 +11,8 @@
     <label>Stories <input name="story_count" type="number" min="1" max="20" value="{{ t.story_count }}"></label>
     <label>Order <input name="position" type="number" min="0" max="99" value="{{ t.position }}"></label>
     <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if t.enabled }}> Show this section</label>
+    <label class="check"><input type="checkbox" name="feel_good" value="1" {{ 'checked' if t.feel_good }}> Feel good section</label>
+    {% if t.feel_good %}<p class="wide small muted">A feel good section goes at the very end of the paper, never on the front page, has no wildcard, and may use stories up to 5 days old. Stories mentioning deaths, violence or disasters are skipped, as are newsletter promotions and weekly round-ups.</p>{% endif %}
     <div class="wide row">
       <button class="btn btn-primary" type="submit">Save</button>
       <span class="small muted grow">{{ t.feed_count }} source{{ 's' if t.feed_count != 1 }}</span>

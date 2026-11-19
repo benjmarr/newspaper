@@ -56,6 +56,16 @@
   {% endif %}
 </section>
 
+{% for sec in feel_good %}
+<section class="section feelgood" aria-labelledby="fg-{{ loop.index }}">
+  <h2 class="section-title" id="fg-{{ loop.index }}"><span aria-hidden="true">☀︎</span> {{ sec.name }}</h2>
+  <p class="feelgood-intro small muted">Something good to finish on.</p>
+  <div class="columns">
+    {% for it in sec["items"] %}{{ card(it, ed_date, path) }}{% endfor %}
+  </div>
+</section>
+{% endfor %}
+
 <div class="to-read-cta">
   <a class="btn btn-primary" href="/reading-list">To read<span class="nav-count" data-to-read-count {{ 'hidden' if not to_read_count }}>{{ to_read_count }}</span> ›</a>
 </div>

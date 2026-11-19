@@ -70,6 +70,12 @@ PROMO = re.compile(
     r"|(?:Download|Get) the (?:free )?Guardian app\b)\s*[.:–—-]?\s*")
 
 
+# Credit lines some sites put at the very start of their summaries.
+LEAD_IN = re.compile(
+    r"^\s*(?:This (?:story|article|piece) (?:was )?originally (?:appeared|published|ran) (?:in|on|by|at) [^.]{1,80}\.\s*"
+    r"|(?:BY|By) [A-Z][A-Z .’'&-]{2,60}?\b(?:TEAM|STAFF|DESK)\b[\s.:|–—-]*)")
+
+
 def remove_promos(text: str) -> str:
     """Strip publisher promotions. The phrases are matched case-sensitively, as publishers write them,
     so an ordinary sentence like "residents can sign up to email alerts" is left alone."""
@@ -81,7 +87,8 @@ def remove_promos(text: str) -> str:
         # "…Gippsland region Get our … podcast William was found" -> "…Gippsland region. William was found"
         end = before.rstrip("”\"’'")  # look past a closing quote: ‘…tumour’ still needs a full stop
         return " " if end and end[-1] in ".!?…:;" else ". "
-    return re.sub(r"\s{2,}", " ", PROMO.sub(repl, text or "")).strip()
+    cleaned = re.sub(r"\s{2,}", " ", PROMO.sub(repl, text or "")).strip()
+    return LEAD_IN.sub("", cleaned).strip()
 
 
 def summarise(text: str, limit: int = 260) -> str:

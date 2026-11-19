@@ -82,6 +82,8 @@ If an article couldn't be saved, the card's button says **Read at source ↗** i
 - Everything learned fades by 5% with each new edition, so old taps matter less over time.
 - To see, forget or reset what has been learned, go to Settings → Learning.
 
+**Feel good.** The paper ends with two or three good-news stories, after "On this day". They come from Good News Network, Optimist Daily and Reasons to be Cheerful, with one story per source where possible. They never appear on the front page, and they may be up to 5 days old because these sites publish less often. Anything in those feeds that mentions deaths, violence or disasters is skipped, as are the sites' newsletter promotions and weekly round-ups. Feel good is an ordinary topic in Settings → Topics, so you can change its story count, add sources to it, turn it off, or tick "Feel good section" on a topic of your own.
+
 **Wildcard.** Each section gets one extra story from further down the rankings, marked *Wildcard*, so you don't only ever see more of the same.
 
 **Rebuild now.** This button is at the bottom of the latest edition and in Settings. Use it after changing topics, sources or exclusions. A banner shows while the build runs, and the page refreshes when it's done. Rebuilding replaces today's edition. Stories that appeared in *earlier* editions are never repeated.
@@ -142,6 +144,7 @@ docker compose up -d
 - BBC World, Guardian World and Al Jazeera (World)
 - Ars Technica, The Verge and BBC Technology (Technology)
 - Motorsport.com and Speedcafe (Motorsport)
+- Good News Network, Optimist Daily and Reasons to be Cheerful (Feel good; also added automatically when upgrading an existing install)
 
 The Warrnambool Standard isn't included because no verified feed was found. If you find one, add it under Sources. The Local & Australia topic already has Warrnambool and south-west Victoria keywords, so local stories from the national feeds rise to the top.
 

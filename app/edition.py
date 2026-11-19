@@ -17,6 +17,7 @@ log = logging.getLogger("paper.edition")
 
 OFFLINE_WINDOW_DAYS = 7
 HISTORY_DAYS = 10
+FEELGOOD_MAX_AGE = timedelta(days=5)
 OFFLINE_RETRY_WINDOW = timedelta(hours=4)   # keep retrying an offline edition until build time + 4 h
 OFFLINE_RETRY_MINUTES = 15
 
@@ -97,9 +98,13 @@ class Builder:
         max_age = timedelta(days=OFFLINE_WINDOW_DAYS) if offline else \
             timedelta(hours=int(db.get_setting("max_age_hours", 36)))
         cutoff = iso(now - max_age)
+        # Good-news sites publish less often, so the Feel good section may use stories up to 5 days old.
+        feelgood_cutoff = iso(now - max(max_age, FEELGOOD_MAX_AGE))
         rows = [dict(r) for r in db.query(
             "SELECT s.*, f.priority, f.treat_as, f.topic_id FROM stories s JOIN feeds f ON f.id = s.feed_id "
-            "WHERE f.paused = 0 AND COALESCE(s.published_at, s.fetched_at) >= ?", (cutoff,))]
+            "LEFT JOIN topics t ON t.id = f.topic_id WHERE f.paused = 0 AND "
+            "(COALESCE(s.published_at, s.fetched_at) >= ? OR "
+            " (t.feel_good = 1 AND COALESCE(s.published_at, s.fetched_at) >= ?))", (cutoff, feelgood_cutoff))]
         shown_ids = {r["story_id"] for r in db.query(
             "SELECT story_id FROM shown WHERE edition_date < ?", (day.isoformat(),))}
         history_titles = [r["title"] for r in db.query(

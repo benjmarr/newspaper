@@ -712,6 +712,10 @@ def test_external_cards_mark_read_on_tap(app, web, logged_in):
     ("A teenager was found near Walhalla Get our breaking news email, free app or daily news podcast William, 17, "
      "is recovering.", "A teenager was found near Walhalla. William, 17, is recovering."),
     ("Locals asked: Sign up for what? The email never came.", "Locals asked: Sign up for what? The email never came."),
+    ("This story was originally published by Grist. Doing the laundry has grown easier.",
+     "Doing the laundry has grown easier."),
+    ("BY THE OPTIMIST DAILY EDITORIAL TEAM Concentrations of PFOS have fallen.", "Concentrations of PFOS have fallen."),
+    ("By the time the team arrived, the fire was out.", "By the time the team arrived, the fire was out."),
 ])
 def test_promotions_removed_from_summaries(raw, expected):
     assert text.summarise(raw) == expected
@@ -727,3 +731,86 @@ def test_promotions_cleaned_on_existing_stories(app, web, logged_in):
                   "Residents near the Hopkins River should prepare.'")
     html = logged_in.get("/").text
     assert "Residents near the Hopkins River" in html and "free app" not in html
+
+
+# --- feel good ----------------------------------------------------------------
+
+def add_feelgood_feed(app, web, items):
+    db = app.state.db
+    topic = db.query_one("SELECT id FROM topics WHERE feel_good = 1")["id"]
+    with db.conn() as c:
+        c.execute("INSERT INTO feeds(name, url, topic_id, priority, created_at) VALUES "
+                  "('Happy Times', 'https://happy.test/rss', ?, 3, '2026-01-01')", (topic,))
+    web.feeds["https://happy.test/rss"] = rss("Happy Times", items)
+    return topic
+
+
+def test_feel_good_section(app, web, logged_in):
+    standard_feeds(web)
+    topic = add_feelgood_feed(app, web, [
+        # Extremely fresh and covered by two outlets would normally make the front page...
+        {"title": "Volunteers plant a million trees across Victoria", "link": "https://happy.test/trees", "age_h": 0},
+        {"title": "Rescued koala returns to the wild after recovery", "link": "https://happy.test/koala", "age_h": 30},
+        {"title": "Town library gets a free piano and everyone plays", "link": "https://happy.test/piano", "age_h": 100},
+        {"title": "Community garden feeds hundreds of families", "link": "https://happy.test/garden", "age_h": 80},
+        # ...but these must never appear in Feel good:
+        {"title": "Hero dog dies after saving family from fire", "link": "https://happy.test/dog"},
+        {"title": "Good News in History, November 19", "link": "https://happy.test/history"},
+        {"title": "Sign up for our weekly newsletter of joy", "link": "https://happy.test/signup"},
+        {"title": "Old story from last month", "link": "https://happy.test/old", "age_h": 24 * 9},
+    ])
+    web.feeds["https://planet.test/rss"] = rss("Planet Post", [  # same good story elsewhere
+        {"title": "Volunteers plant one million trees across Victoria", "link": "https://planet.test/trees"}])
+    result = build(app)
+    items = edition_items(app)
+    fg = [i for i in items if i["section"] == str(topic)]
+    titles = [i["title"] for i in fg]
+    assert len(fg) == 3 and not any(i["wildcard"] for i in fg)
+    assert not any(i["section"] == "lead" and "trees" in i["title"] for i in items)
+    assert "Town library gets a free piano and everyone plays" in titles  # 4 days old is fine here
+    for bad in ("Hero dog", "Good News in History", "Sign up", "Old story"):
+        assert not any(bad in t for t in titles), bad
+    assert result["stats"]["not_feel_good"] == 3
+    # Rendered last: after On this day, before the To read button.
+    html = logged_in.get("/").text
+    assert html.index("On this day") < html.index('class="section feelgood"') < html.index('class="to-read-cta"')
+
+
+def test_feel_good_setting_toggle(app, logged_in):
+    db = app.state.db
+    t = db.query_one("SELECT * FROM topics WHERE name='Technology'")
+    logged_in.post(f"/settings/topics/{t['id']}", data={"name": t["name"], "keywords": t["keywords"], "importance": 3,
+                                                        "story_count": 6, "position": 2, "enabled": "1",
+                                                        "feel_good": "1"})
+    assert db.query_one("SELECT feel_good FROM topics WHERE id=?", (t["id"],))["feel_good"] == 1
+    assert "A feel good section goes at the very end" in logged_in.get("/settings/topics").text
+
+
+def test_existing_database_gets_feel_good_once(tmp_path):
+    """Databases from before this feature are upgraded in place, exactly once."""
+    import sqlite3
+    from app.db import Database
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript("""
+        CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE topics (id INTEGER PRIMARY KEY, name TEXT NOT NULL, keywords TEXT NOT NULL DEFAULT '',
+            importance INTEGER NOT NULL DEFAULT 3, story_count INTEGER NOT NULL DEFAULT 6,
+            position INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1);
+        INSERT INTO settings VALUES ('seeded', 'true');
+        INSERT INTO topics(name, position) VALUES ('Mine', 0);
+    """)
+    old.commit()
+    old.close()
+    db = Database(path)
+    db.init()
+    db.init()  # a second start must not add it again
+    rows = db.query("SELECT name, feel_good, story_count FROM topics ORDER BY id")
+    assert [tuple(r) for r in rows] == [("Mine", 0, 6), ("Feel good", 1, 3)]
+    assert len(db.query("SELECT 1 FROM feeds f JOIN topics t ON t.id = f.topic_id WHERE t.feel_good = 1")) == 3
+    # If you delete the section, it stays deleted.
+    with db.conn() as c:
+        c.execute("DELETE FROM feeds")
+        c.execute("DELETE FROM topics WHERE feel_good = 1")
+    db.init()
+    assert db.query_one("SELECT 1 FROM topics WHERE feel_good = 1") is None

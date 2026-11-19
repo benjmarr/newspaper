@@ -156,6 +156,13 @@ DEFAULT_FEEDS = [
     ("Speedcafe", "https://speedcafe.com/feed/", "Motorsport", 4),
 ]
 
+FEELGOOD_FEEDS = [
+    # name, url, priority
+    ("Good News Network", "https://www.goodnewsnetwork.org/feed/", 3),
+    ("Optimist Daily", "https://www.optimistdaily.com/feed/", 3),
+    ("Reasons to be Cheerful", "https://reasonstobecheerful.world/feed/", 4),
+]
+
 DEFAULT_SETTINGS: dict[str, Any] = {
     "build_time": "05:00",
     "location": {"name": "Warrnambool", "admin1": "Victoria", "country": "Australia",
@@ -221,6 +228,22 @@ class Database:
             seeded = c.execute("SELECT value FROM settings WHERE key='seeded'").fetchone()
             if not seeded:
                 self._seed(c)
+            self._migrate(c)
+
+    def _migrate(self, c: sqlite3.Connection) -> None:
+        """Upgrades for databases created by earlier versions. Each step runs once."""
+        columns = {r["name"] for r in c.execute("PRAGMA table_info(topics)")}
+        if "feel_good" not in columns:
+            c.execute("ALTER TABLE topics ADD COLUMN feel_good INTEGER NOT NULL DEFAULT 0")
+        if not c.execute("SELECT 1 FROM settings WHERE key='feelgood_seeded'").fetchone():
+            pos = c.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM topics").fetchone()[0]
+            cur = c.execute("INSERT INTO topics(name, keywords, importance, story_count, position, feel_good) "
+                            "VALUES ('Feel good', '', 1, 3, ?, 1)", (max(pos, 90),))
+            now = iso(utcnow())
+            for name, url, priority in FEELGOOD_FEEDS:
+                c.execute("INSERT OR IGNORE INTO feeds(name, url, topic_id, priority, created_at) VALUES (?,?,?,?,?)",
+                          (name, url, cur.lastrowid, priority, now))
+            c.execute("INSERT INTO settings(key, value) VALUES ('feelgood_seeded', 'true')")
 
     def _seed(self, c: sqlite3.Connection) -> None:
         now = iso(utcnow())

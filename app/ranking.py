@@ -14,6 +14,15 @@ from .db import parse_iso
 from .learning import story_preference
 
 LEAD_COUNT = 3
+
+# The Feel good section skips anything grim that slips into good-news feeds, plus round-ups and promotions.
+DOWNER = re.compile(
+    r"\b(killed|kills?|killing|murder\w*|homicide|shooting|shot dead|stabb\w*|massacre|genocide|war crimes?|"
+    r"terror\w*|bomb\w*|suicide|abuse[ds]?|rape[ds]?|assault\w*|died|dies|dead|death|deaths|fatal\w*|"
+    r"tragedy|tragic|disaster|catastroph\w*|outbreak|famine)\b", re.I)
+FEELGOOD_SKIP = re.compile(
+    r"^(good news in history|what we.re reading|good news this week|this week.s good news)|"
+    r"\bsign up\b|\bnewsletter\b|\bsubscribe\b|\bgiveaway\b", re.I)
 OPINION_CAP = 2
 SAME_STORY = 0.72
 
@@ -160,6 +169,10 @@ def select(rows: list[dict[str, Any]], topics: list[dict[str, Any]], exclusions:
         if text.excluded_by(pattern, row["title"], row.get("summary") or "", cats):
             stats["excluded"] += 1
             continue
+        if (topic_by_id.get(row.get("topic_id")) or {}).get("feel_good") and (
+                FEELGOOD_SKIP.search(row["title"]) or DOWNER.search(f"{row['title']} {row.get('summary') or ''}")):
+            stats["not_feel_good"] = stats.get("not_feel_good", 0) + 1
+            continue
         cands.append(make_candidate(row, now))
 
     history = []
@@ -192,13 +205,23 @@ def select(rows: list[dict[str, Any]], topics: list[dict[str, Any]], exclusions:
         items.append({"story_id": cl.primary.id, "section": section, "topic_id": cl.topic_id,
                       "position": position, "wildcard": wildcard, "also": cl.also(), "score": round(cl.score, 2)})
 
-    leads = [c for c in clusters if c.primary.label != "opinion"][:LEAD_COUNT]
+    leads = [c for c in clusters if c.primary.label != "opinion"
+             and not topic_by_id[c.topic_id].get("feel_good")][:LEAD_COUNT]
     for i, cl in enumerate(leads):
         take(cl, "lead", i)
 
     rng = random.Random(seed)
     for topic in sorted(topic_by_id.values(), key=lambda t: (t["position"], t["id"])):
         pool = [c for c in clusters if c.topic_id == topic["id"] and id(c) not in used]
+        if topic.get("feel_good"):
+            # A mix of sources reads better here: best story from each source first, then the rest.
+            seen_sources: set[str] = set()
+            firsts = []
+            for c in pool:
+                if c.primary.row["source_name"] not in seen_sources:
+                    seen_sources.add(c.primary.row["source_name"])
+                    firsts.append(c)
+            pool = firsts + [c for c in pool if c not in firsts]
         picked, opinions = 0, 0
         for cl in pool:
             if picked >= topic["story_count"]:
@@ -212,7 +235,7 @@ def select(rows: list[dict[str, Any]], topics: list[dict[str, Any]], exclusions:
         rest = [c for c in pool if id(c) not in used and
                 story_preference(*weights, c.primary.row["title"], c.primary.row.get("feed_id")) >= 0 and
                 (c.primary.label != "opinion" or opinions < OPINION_CAP)]
-        if rest:
+        if rest and not topic.get("feel_good"):
             take(rng.choice(rest), str(topic["id"]), picked, wildcard=True)
 
     stats["selected"] = len(items)
