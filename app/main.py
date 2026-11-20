@@ -98,10 +98,7 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         return row["n"] if row else 0
 
     def back(request: Request, default: str = "/", **params: str) -> RedirectResponse:
-        target = default
-        nxt = request.query_params.get("next") or ""
-        if safe_next(nxt):
-            target = nxt
+        target = safe_redirect(request.query_params.get("next"), default)
         if params:
             frag = ""
             if "#" in target:
@@ -175,12 +172,12 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
         if auth.valid_cookie(request.cookies.get(COOKIE)):
             return back(request)
         return render(request, "login.html", locked=auth.locked_for(client_id(request)),
-                      next=request.query_params.get("next", "/"))
+                      next=safe_redirect(request.query_params.get("next")))
 
     @app.post("/login")
     def login(request: Request, password: str = Form(""), next: str = Form("/")):
         cid = client_id(request)
-        nxt = next if safe_next(next) else "/"
+        nxt = safe_redirect(next)
         locked = auth.locked_for(cid)
         if locked:
             return render(request, "login.html", status=429, locked=locked, next=nxt)
@@ -188,7 +185,7 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
             auth.record_success(cid)
             resp = RedirectResponse(nxt, status_code=303)
             resp.set_cookie(COOKIE, auth.make_cookie(), max_age=MAX_AGE, httponly=True, samesite="lax",
-                            secure=request.url.scheme == "https", path="/")
+                            secure=is_https(request), path="/")
             return resp
         left = auth.record_failure(cid)
         if left == 0:
@@ -198,9 +195,9 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
                             f"before a 5-minute lockout.")
 
     @app.post("/logout")
-    def logout():
+    def logout(request: Request):
         resp = RedirectResponse("/login", status_code=303)
-        resp.delete_cookie(COOKIE, path="/")
+        resp.delete_cookie(COOKIE, path="/", httponly=True, samesite="lax", secure=is_https(request))
         return resp
 
     # --- editions ------------------------------------------------------
@@ -719,13 +716,45 @@ def create_app(config: Config | None = None, builder_kwargs: dict[str, Any] | No
     return app
 
 
+def is_https(request: Request) -> bool:
+    """Whether the browser reached us over HTTPS, directly or through a TLS-terminating reverse proxy.
+
+    uvicorn's --proxy-headers only trusts X-Forwarded-Proto from 127.0.0.1, so a proxy in another container
+    (Caddy, Nginx Proxy Manager) would otherwise look like plain HTTP and the cookie would lose its Secure flag.
+    Trusting the header here is harmless: it can only add Secure, never remove it.
+    """
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return request.url.scheme == "https" or proto == "https"
+
+
 def is_fetch(request: Request) -> bool:
     return request.headers.get("x-requested-with") == "fetch"
 
 
-def safe_next(value: str) -> bool:
-    return bool(value) and value.startswith("/") and not value.startswith("//") and "\\" not in value \
-        and "\n" not in value and "\r" not in value
+def is_safe_redirect(value: str | None) -> bool:
+    """True only for a relative path on this app, e.g. "/archive?d=1#x".
+
+    FastAPI/Starlette has no equivalent of Django's url_has_allowed_host_and_scheme, so this does the same job:
+    exactly one leading "/", never "//" or "/\\" (browsers read both as another host), no backslashes or control
+    characters anywhere (browsers turn "\\" into "/" and silently drop tabs and newlines, so "/\t/evil.com" would
+    become "//evil.com"), and nothing that parses with a scheme or host.
+    """
+    if not value or not isinstance(value, str):
+        return False
+    if value[0] != "/" or value[1:2] in ("/", "\\"):
+        return False
+    if "\\" in value or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
+        return False
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        return False
+    return not parts.scheme and not parts.netloc
+
+
+def safe_redirect(value: str | None, default: str = "/") -> str:
+    """The value if it is a safe local path, otherwise the default. Never raises."""
+    return value if is_safe_redirect(value) else default
 
 
 def redirect_settings(tab: str, msg: str = "", err: str = "") -> RedirectResponse:

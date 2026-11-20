@@ -45,9 +45,74 @@ def test_login_success_sets_30_day_cookie(client):
     assert client.get("/archive").status_code == 200
 
 
-def test_login_rejects_open_redirect(client):
-    r = client.post("/login", data={"password": PASSWORD, "next": "//evil.example/"}, follow_redirects=False)
-    assert r.headers["location"] == "/"
+SAFE_NEXT = ["/", "/section/tech", "/archive?d=2026-11-01#story-3"]
+UNSAFE_NEXT = ["//example.com", "/\\example.com", "https://example.com", "http:example.com",
+               "javascript:alert(1)", "", "%2F%2Fexample.com", "//evil.example/", "///example.com",
+               " //example.com", "/\t/example.com", "/\n/example.com", "/\x00/example.com", "/a\\b"]
+
+
+@pytest.mark.parametrize("value", SAFE_NEXT)
+def test_is_safe_redirect_allows_local_paths(value):
+    from app.main import is_safe_redirect, safe_redirect
+    assert is_safe_redirect(value) and safe_redirect(value) == value
+
+
+@pytest.mark.parametrize("value", UNSAFE_NEXT + [None])
+def test_is_safe_redirect_falls_back_to_root(value):
+    from app.main import is_safe_redirect, safe_redirect
+    assert not is_safe_redirect(value) and safe_redirect(value) == "/"
+
+
+@pytest.mark.parametrize("value,expected", [(v, v) for v in SAFE_NEXT] + [(v, "/") for v in UNSAFE_NEXT])
+def test_login_next_only_redirects_within_the_app(client, value, expected):
+    r = client.post("/login", data={"password": PASSWORD, "next": value}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == expected
+
+
+@pytest.mark.parametrize("value", UNSAFE_NEXT)
+def test_other_next_redirects_stay_within_the_app(app, web, logged_in, value):
+    # Already signed in: GET /login bounces straight on to ?next.
+    r = logged_in.get("/login", params={"next": value}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    # Story buttons post back to ?next too.
+    standard_feeds(web)
+    build(app)
+    sid = story_id(app, "breakwater")
+    r = logged_in.post(f"/story/{sid}/read", params={"next": value}, data={"value": "read"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/#story-{sid}"
+
+
+def test_login_form_does_not_echo_unsafe_next(client):
+    r = client.get("/login", params={"next": "https://example.com"})
+    assert 'name="next" value="/"' in r.text
+    r = client.get("/login", params={"next": "/archive"})
+    assert 'name="next" value="/archive"' in r.text
+
+
+def test_logout_redirects_to_login_and_clears_cookie(logged_in):
+    r = logged_in.post("/logout", params={"next": "//example.com"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
+    assert 'paper_session=""' in r.headers["set-cookie"] and "Max-Age=0" in r.headers["set-cookie"]
+
+
+def test_session_cookie_flags_over_http(client):
+    r = client.post("/login", data={"password": PASSWORD}, follow_redirects=False)
+    cookie = r.headers["set-cookie"]
+    assert "HttpOnly" in cookie and "samesite=lax" in cookie.lower() and "Path=/" in cookie
+    assert "Secure" not in cookie  # plain-HTTP LAN use must keep working
+
+
+def test_session_cookie_is_secure_over_https(app):
+    from fastapi.testclient import TestClient
+    with TestClient(app, base_url="https://paper.test") as c:
+        cookie = c.post("/login", data={"password": PASSWORD}, follow_redirects=False).headers["set-cookie"]
+    assert "Secure" in cookie and "HttpOnly" in cookie and "samesite=lax" in cookie.lower()
+
+
+def test_session_cookie_is_secure_behind_https_proxy(client):
+    r = client.post("/login", data={"password": PASSWORD}, headers={"x-forwarded-proto": "https"},
+                    follow_redirects=False)
+    assert "Secure" in r.headers["set-cookie"]
 
 
 def test_lockout_after_five_failures(client):
